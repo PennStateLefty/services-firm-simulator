@@ -4,7 +4,7 @@ namespace OnboardingService.Models;
 
 public class Task
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Id { get; set; } = string.Empty;
     public string OnboardingCaseId { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -18,6 +18,7 @@ public class Task
 
     public Task()
     {
+        Id = Guid.NewGuid().ToString();
         CreatedAt = DateTime.UtcNow;
         UpdatedAt = DateTime.UtcNow;
     }
