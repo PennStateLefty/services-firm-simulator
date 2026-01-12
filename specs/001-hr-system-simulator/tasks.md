@@ -22,23 +22,23 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Create .NET solution structure with Aspire AppHost at src/AppHost/Program.cs
-- [ ] T002 [P] Initialize EmployeeService project at src/EmployeeService/ with ASP.NET Core Web API template
-- [ ] T003 [P] Initialize OnboardingService project at src/OnboardingService/ with ASP.NET Core Web API template
-- [ ] T004 [P] Initialize PerformanceService project at src/PerformanceService/ with ASP.NET Core Web API template
-- [ ] T005 [P] Initialize MeritService project at src/MeritService/ with ASP.NET Core Web API template
-- [ ] T006 [P] Initialize OffboardingService project at src/OffboardingService/ with ASP.NET Core Web API template
-- [ ] T007 Initialize React frontend at frontend/ with Vite and TypeScript
-- [ ] T008 [P] Add Dapr.AspNetCore NuGet package to all service projects
-- [ ] T009 [P] Add Aspire.Hosting NuGet package to AppHost project
-- [ ] T010 Configure Dapr components for local development at .dapr/components/statestore.yaml (Redis)
-- [ ] T011 [P] Configure Dapr components for local development at .dapr/components/pubsub.yaml (in-memory)
-- [ ] T012 [P] Setup ESLint and Prettier for frontend at frontend/.eslintrc.json and frontend/.prettierrc
-- [ ] T013 [P] Setup Roslyn analyzers for .NET projects in Directory.Build.props at repository root
-- [ ] T014 [P] Create xUnit test projects at tests/EmployeeService.Tests/, tests/OnboardingService.Tests/, tests/PerformanceService.Tests/, tests/MeritService.Tests/, tests/OffboardingService.Tests/
-- [ ] T015 [P] Install Pact.NET NuGet package (PactNet) to tests/Contract.Tests/ project for consumer-driven contract testing
-- [ ] T016 [P] Configure code coverage collection in Directory.Build.props with 70% threshold for business logic and Coverlet collector
-- [ ] T017 Create Bicep infrastructure templates at infra/main.bicep for Azure Container Apps environment
+- [X] T001 Create .NET solution structure with Aspire AppHost at src/AppHost/Program.cs
+- [X] T002 [P] Initialize EmployeeService project at src/EmployeeService/ with ASP.NET Core Web API template
+- [X] T003 [P] Initialize OnboardingService project at src/OnboardingService/ with ASP.NET Core Web API template
+- [X] T004 [P] Initialize PerformanceService project at src/PerformanceService/ with ASP.NET Core Web API template
+- [X] T005 [P] Initialize MeritService project at src/MeritService/ with ASP.NET Core Web API template
+- [X] T006 [P] Initialize OffboardingService project at src/OffboardingService/ with ASP.NET Core Web API template
+- [X] T007 Initialize React frontend at frontend/ with Vite and TypeScript
+- [X] T008 [P] Add Dapr.AspNetCore NuGet package to all service projects
+- [X] T009 [P] Add Aspire.Hosting NuGet package to AppHost project
+- [X] T010 Configure Dapr components for local development at .dapr/components/statestore.yaml (Redis)
+- [X] T011 [P] Configure Dapr components for local development at .dapr/components/pubsub.yaml (in-memory)
+- [X] T012 [P] Setup ESLint and Prettier for frontend at frontend/.eslintrc.json and frontend/.prettierrc
+- [X] T013 [P] Setup Roslyn analyzers for .NET projects in Directory.Build.props at repository root
+- [X] T014 [P] Create xUnit test projects at tests/EmployeeService.Tests/, tests/OnboardingService.Tests/, tests/PerformanceService.Tests/, tests/MeritService.Tests/, tests/OffboardingService.Tests/
+- [X] T015 [P] Install Pact.NET NuGet package (PactNet) to tests/Contract.Tests/ project for consumer-driven contract testing
+- [X] T016 [P] Configure code coverage collection in Directory.Build.props with 70% threshold for business logic and Coverlet collector
+- [X] T017 Create Bicep infrastructure templates at infra/main.bicep for Azure Container Apps environment
 
 ---
 

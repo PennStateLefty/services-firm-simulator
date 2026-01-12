@@ -1,0 +1,9 @@
+{
+  "appContainerApps": "ca",
+  "appManagedEnvironments": "cae",
+  "cacheRedis": "redis",
+  "containerRegistryRegistries": "cr",
+  "insightsComponents": "appi",
+  "operationalInsightsWorkspaces": "log",
+  "webStaticSites": "stapp"
+}

@@ -1,0 +1,6 @@
+@MeritService_HostAddress = http://localhost:5221
+
+GET {{MeritService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
