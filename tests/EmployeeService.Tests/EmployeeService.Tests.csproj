@@ -23,4 +23,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EmployeeService\EmployeeService.csproj" />
+  </ItemGroup>
+
 </Project>
