@@ -14,6 +14,7 @@ builder.Services.AddSingleton<IDaprStateStore, DaprStateStore>();
 
 // Add services
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeServiceImpl>();
 
 // Add controllers
 builder.Services.AddControllers().AddDapr();

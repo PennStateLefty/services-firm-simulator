@@ -1,0 +1,197 @@
+using EmployeeService.Infrastructure;
+using EmployeeService.Models;
+using Shared.Models;
+using System.ComponentModel.DataAnnotations;
+
+namespace EmployeeService.Services;
+
+public interface IEmployeeService
+{
+    Task<Employee?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Employee>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<Employee> CreateAsync(CreateEmployeeRequest request, CancellationToken cancellationToken = default);
+    Task<Employee> UpdateAsync(string id, UpdateEmployeeRequest request, CancellationToken cancellationToken = default);
+    Task DeleteAsync(string id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Employee>> QueryAsync(string filter, CancellationToken cancellationToken = default);
+}
+
+public class EmployeeServiceImpl : IEmployeeService
+{
+    private readonly IDaprStateStore _stateStore;
+    private readonly ILogger<EmployeeServiceImpl> _logger;
+    private const string EmployeePrefix = "employee:";
+
+    public EmployeeServiceImpl(IDaprStateStore stateStore, ILogger<EmployeeServiceImpl> logger)
+    {
+        _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task<Employee?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Getting employee by ID: {Id}", id);
+        var employee = await _stateStore.GetStateAsync<Employee>($"{EmployeePrefix}{id}", cancellationToken);
+        
+        if (employee == null)
+        {
+            _logger.LogWarning("Employee not found: {Id}", id);
+        }
+        
+        return employee;
+    }
+
+    public async Task<IEnumerable<Employee>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Getting all employees");
+        
+        var employees = await _stateStore.QueryStateAsync<Employee>(
+            "{}", 
+            cancellationToken
+        );
+        
+        return employees;
+    }
+
+    public async Task<Employee> CreateAsync(CreateEmployeeRequest request, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Creating employee: {EmployeeNumber}", request.EmployeeNumber);
+        
+        // Validate the request
+        var validationContext = new ValidationContext(request);
+        var validationResults = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(request, validationContext, validationResults, true))
+        {
+            var errors = string.Join(", ", validationResults.Select(vr => vr.ErrorMessage));
+            _logger.LogError("Validation failed for employee creation: {Errors}", errors);
+            throw new ValidationException($"Validation failed: {errors}");
+        }
+        
+        var employee = new Employee
+        {
+            Id = Guid.NewGuid().ToString(),
+            EmployeeNumber = request.EmployeeNumber,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            DepartmentId = request.DepartmentId,
+            Title = request.Title,
+            Level = request.Level,
+            Salary = request.Salary,
+            HireDate = request.HireDate,
+            Status = request.Status,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
+        
+        _logger.LogInformation("Employee created: {Id}", employee.Id);
+        return employee;
+    }
+
+    public async Task<Employee> UpdateAsync(string id, UpdateEmployeeRequest request, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Updating employee: {Id}", id);
+        
+        // Validate the request
+        var validationContext = new ValidationContext(request);
+        var validationResults = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(request, validationContext, validationResults, true))
+        {
+            var errors = string.Join(", ", validationResults.Select(vr => vr.ErrorMessage));
+            _logger.LogError("Validation failed for employee update: {Errors}", errors);
+            throw new ValidationException($"Validation failed: {errors}");
+        }
+        
+        var employee = await GetByIdAsync(id, cancellationToken);
+        if (employee == null)
+        {
+            _logger.LogError("Employee not found for update: {Id}", id);
+            throw new KeyNotFoundException($"Employee with ID {id} not found");
+        }
+
+        // Update only the provided fields
+        if (!string.IsNullOrWhiteSpace(request.FirstName))
+        {
+            employee.FirstName = request.FirstName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.LastName))
+        {
+            employee.LastName = request.LastName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            employee.Email = request.Email;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.DepartmentId))
+        {
+            employee.DepartmentId = request.DepartmentId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Title))
+        {
+            employee.Title = request.Title;
+        }
+
+        if (request.Level.HasValue)
+        {
+            employee.Level = request.Level.Value;
+        }
+
+        if (request.Salary.HasValue)
+        {
+            employee.Salary = request.Salary.Value;
+        }
+
+        if (request.TerminationDate.HasValue)
+        {
+            employee.TerminationDate = request.TerminationDate.Value;
+        }
+
+        if (request.Status.HasValue)
+        {
+            employee.Status = request.Status.Value;
+        }
+
+        employee.UpdatedAt = DateTime.UtcNow;
+
+        await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
+        
+        _logger.LogInformation("Employee updated: {Id}", employee.Id);
+        return employee;
+    }
+
+    public async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Deleting employee (soft delete): {Id}", id);
+        
+        var employee = await GetByIdAsync(id, cancellationToken);
+        if (employee == null)
+        {
+            _logger.LogError("Employee not found for deletion: {Id}", id);
+            throw new KeyNotFoundException($"Employee with ID {id} not found");
+        }
+
+        // Soft delete: update status to Terminated
+        employee.Status = EmploymentStatus.Terminated;
+        employee.TerminationDate = DateTime.UtcNow;
+        employee.UpdatedAt = DateTime.UtcNow;
+
+        await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
+        
+        _logger.LogInformation("Employee soft deleted: {Id}", employee.Id);
+    }
+
+    public async Task<IEnumerable<Employee>> QueryAsync(string filter, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Querying employees with filter: {Filter}", filter);
+        
+        var employees = await _stateStore.QueryStateAsync<Employee>(filter, cancellationToken);
+        
+        _logger.LogInformation("Query returned {Count} employees", employees.Count());
+        return employees;
+    }
+}
