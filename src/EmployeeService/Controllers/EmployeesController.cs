@@ -192,7 +192,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("{employeeId}")]
-    public async Task<ActionResult<Employee>> GetEmployee(string employeeId, CancellationToken cancellationToken)
+    public async Task<ActionResult<EmployeeDto>> GetEmployee(string employeeId, CancellationToken cancellationToken)
     {
         try
         {
@@ -205,7 +205,56 @@ public class EmployeesController : ControllerBase
                 return NotFound(ErrorResponse.NotFound("Employee", HttpContext.TraceIdentifier));
             }
 
-            return Ok(employee);
+            // Get department name
+            var department = await _departmentService.GetByIdAsync(employee.DepartmentId, cancellationToken);
+            var departmentName = department?.Name ?? employee.DepartmentId;
+
+            // Map to DTO matching OpenAPI spec structure
+            var employeeDto = new EmployeeDto
+            {
+                Id = employee.Id,
+                EmployeeNumber = employee.EmployeeNumber,
+                PersonalInfo = new PersonalInfo
+                {
+                    FirstName = employee.FirstName,
+                    LastName = employee.LastName,
+                    Email = employee.Email,
+                    PhoneNumber = null, // Not in current Employee model
+                    Address = null // Not in current Employee model
+                },
+                EmploymentInfo = new EmploymentInfo
+                {
+                    HireDate = employee.HireDate,
+                    JobTitle = employee.Title,
+                    Department = departmentName,
+                    ManagerId = null, // Not in current Employee model
+                    EmploymentType = "FullTime", // Default, not in current Employee model
+                    Status = employee.Status switch
+                    {
+                        EmploymentStatus.Pending => "Onboarding",
+                        EmploymentStatus.Active => "Active",
+                        EmploymentStatus.Terminated => "Inactive",
+                        EmploymentStatus.OnLeave => "Active",
+                        _ => employee.Status.ToString()
+                    }
+                },
+                Compensation = new Compensation
+                {
+                    SalaryType = "Annual", // Default, not in current Employee model
+                    CurrentSalary = employee.Salary,
+                    Currency = "USD",
+                    BonusTarget = null // Not in current Employee model
+                },
+                Metadata = new Metadata
+                {
+                    CreatedAt = employee.CreatedAt,
+                    UpdatedAt = employee.UpdatedAt,
+                    CreatedBy = null, // Not in current Employee model
+                    LastModifiedBy = null // Not in current Employee model
+                }
+            };
+
+            return Ok(employeeDto);
         }
         catch (Exception ex)
         {
