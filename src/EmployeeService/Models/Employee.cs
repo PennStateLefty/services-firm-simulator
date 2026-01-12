@@ -31,7 +31,7 @@ public class Employee
     [Range(1, 10)]
     public int Level { get; set; }
 
-    [Range(0, double.MaxValue)]
+    [Range(0.0, 10000000.0)]
     public decimal Salary { get; set; }
 
     [Required]

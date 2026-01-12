@@ -243,6 +243,7 @@ public class EmployeeModelTests
         // Assert
         Assert.NotNull(attribute);
         Assert.Equal(0.0, Convert.ToDouble(attribute.Minimum));
+        Assert.Equal(10000000.0, Convert.ToDouble(attribute.Maximum));
     }
 
     [Fact]
