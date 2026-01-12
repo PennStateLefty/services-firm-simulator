@@ -660,4 +660,234 @@ public class EmployeesControllerTests
         var errorResponse = Assert.IsType<ErrorResponse>(statusCodeResult.Value);
         Assert.Equal(500, errorResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task UpdateEmployee_ValidRequest_Returns200Ok()
+    {
+        // Arrange
+        var employeeId = "emp-123";
+        var request = new UpdateEmployeeRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith",
+            JobTitle = "Senior Software Engineer",
+            Department = "Engineering",
+            PhoneNumber = "555-0123",
+            EmploymentType = EmploymentType.FullTime
+        };
+
+        var department = new Department
+        {
+            Id = "dept-123",
+            Name = "Engineering"
+        };
+
+        var updatedEmployee = new Employee
+        {
+            Id = employeeId,
+            EmployeeNumber = "EMP2026000001",
+            PersonalInfo = new PersonalInfo
+            {
+                FirstName = "Jane",
+                LastName = "Smith",
+                Email = "jane.smith@example.com",
+                PhoneNumber = "555-0123"
+            },
+            EmploymentInfo = new EmploymentInfo
+            {
+                JobTitle = "Senior Software Engineer",
+                Department = "Engineering",
+                HireDate = new DateTime(2026, 1, 1),
+                EmploymentType = EmploymentType.FullTime,
+                Status = EmploymentStatus.Active
+            },
+            Compensation = new Compensation
+            {
+                SalaryType = SalaryType.Annual,
+                CurrentSalary = 120000m,
+                Currency = "USD"
+            },
+            Metadata = new Metadata
+            {
+                CreatedAt = new DateTime(2026, 1, 1),
+                UpdatedAt = DateTime.UtcNow
+            }
+        };
+
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Department> { department });
+
+        _mockEmployeeService.Setup(x => x.UpdateAsync(employeeId, request, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(updatedEmployee);
+
+        // Act
+        var result = await _controller.UpdateEmployee(employeeId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(200, okResult.StatusCode);
+        
+        var returnedEmployee = Assert.IsType<Employee>(okResult.Value);
+        Assert.Equal(employeeId, returnedEmployee.Id);
+        Assert.Equal("Jane", returnedEmployee.PersonalInfo.FirstName);
+        Assert.Equal("Smith", returnedEmployee.PersonalInfo.LastName);
+        Assert.Equal("Senior Software Engineer", returnedEmployee.EmploymentInfo.JobTitle);
+    }
+
+    [Fact]
+    public async Task UpdateEmployee_EmployeeNotFound_Returns404NotFound()
+    {
+        // Arrange
+        var employeeId = "non-existent-emp";
+        var request = new UpdateEmployeeRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith"
+        };
+
+        _mockEmployeeService.Setup(x => x.UpdateAsync(employeeId, request, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException($"Employee with ID {employeeId} not found"));
+
+        // Act
+        var result = await _controller.UpdateEmployee(employeeId, request, CancellationToken.None);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
+        Assert.Equal(404, notFoundResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(notFoundResult.Value);
+        Assert.Equal(404, errorResponse.StatusCode);
+        Assert.Contains("Employee", errorResponse.Message);
+    }
+
+    [Fact]
+    public async Task UpdateEmployee_DepartmentNotFound_Returns400BadRequest()
+    {
+        // Arrange
+        var employeeId = "emp-123";
+        var request = new UpdateEmployeeRequest
+        {
+            Department = "NonExistentDepartment"
+        };
+
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Department>());
+
+        // Act
+        var result = await _controller.UpdateEmployee(employeeId, request, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(badRequestResult.Value);
+        Assert.Equal(400, errorResponse.StatusCode);
+        Assert.NotNull(errorResponse.Errors);
+        Assert.Contains("Department", errorResponse.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task UpdateEmployee_ValidationException_Returns400BadRequest()
+    {
+        // Arrange
+        var employeeId = "emp-123";
+        var request = new UpdateEmployeeRequest
+        {
+            FirstName = "J" // Assuming this might be too short or invalid
+        };
+
+        _mockEmployeeService.Setup(x => x.UpdateAsync(employeeId, request, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new ValidationException("Validation failed"));
+
+        // Act
+        var result = await _controller.UpdateEmployee(employeeId, request, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(badRequestResult.Value);
+        Assert.Equal(400, errorResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEmployee_UnexpectedException_Returns500InternalServerError()
+    {
+        // Arrange
+        var employeeId = "emp-123";
+        var request = new UpdateEmployeeRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith"
+        };
+
+        _mockEmployeeService.Setup(x => x.UpdateAsync(employeeId, request, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Database connection failed"));
+
+        // Act
+        var result = await _controller.UpdateEmployee(employeeId, request, CancellationToken.None);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(statusCodeResult.Value);
+        Assert.Equal(500, errorResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateEmployee_PartialUpdate_OnlyUpdatesProvidedFields()
+    {
+        // Arrange
+        var employeeId = "emp-123";
+        var request = new UpdateEmployeeRequest
+        {
+            JobTitle = "Lead Engineer" // Only updating job title
+        };
+
+        var updatedEmployee = new Employee
+        {
+            Id = employeeId,
+            EmployeeNumber = "EMP2026000001",
+            PersonalInfo = new PersonalInfo
+            {
+                FirstName = "John", // Unchanged
+                LastName = "Doe",   // Unchanged
+                Email = "john.doe@example.com"
+            },
+            EmploymentInfo = new EmploymentInfo
+            {
+                JobTitle = "Lead Engineer", // Updated
+                Department = "Engineering",
+                HireDate = new DateTime(2026, 1, 1),
+                EmploymentType = EmploymentType.FullTime,
+                Status = EmploymentStatus.Active
+            },
+            Compensation = new Compensation
+            {
+                SalaryType = SalaryType.Annual,
+                CurrentSalary = 100000m,
+                Currency = "USD"
+            },
+            Metadata = new Metadata
+            {
+                CreatedAt = new DateTime(2026, 1, 1),
+                UpdatedAt = DateTime.UtcNow
+            }
+        };
+
+        _mockEmployeeService.Setup(x => x.UpdateAsync(employeeId, request, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(updatedEmployee);
+
+        // Act
+        var result = await _controller.UpdateEmployee(employeeId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(200, okResult.StatusCode);
+        
+        var returnedEmployee = Assert.IsType<Employee>(okResult.Value);
+        Assert.Equal("Lead Engineer", returnedEmployee.EmploymentInfo.JobTitle);
+        Assert.Equal("John", returnedEmployee.PersonalInfo.FirstName); // Should remain unchanged
+    }
 }
