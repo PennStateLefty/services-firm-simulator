@@ -815,7 +815,7 @@ public class EmployeeServiceTests
     public async Task CreateAsync_CreatesCompensationHistory()
     {
         // Arrange
-        var hireDate = new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc);
+        var hireDate = DateTime.UtcNow.AddDays(30);
         var salary = 120000.00m;
         var request = new CreateEmployeeRequest
         {
@@ -875,7 +875,7 @@ public class EmployeeServiceTests
             DepartmentId = "dept-456",
             Level = 7,
             Salary = 150000.00m,
-            HireDate = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
+            HireDate = DateTime.UtcNow.AddDays(30),
             Status = EmploymentStatus.Pending
         };
 
