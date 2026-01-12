@@ -94,21 +94,42 @@ public class EmployeeServiceImpl : IEmployeeService
         var employeeNumber = await GenerateEmployeeNumberAsync(cancellationToken);
         _logger.LogInformation("Generated employee number: {EmployeeNumber}", employeeNumber);
         
+        var now = DateTime.UtcNow;
         var employee = new Employee
         {
             Id = Guid.NewGuid().ToString(),
             EmployeeNumber = employeeNumber,
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Email = request.Email,
-            DepartmentId = request.DepartmentId,
-            Title = request.Title,
-            Level = request.Level,
-            Salary = request.Salary,
-            HireDate = request.HireDate,
-            Status = request.Status,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            PersonalInfo = new PersonalInfo
+            {
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                PhoneNumber = request.PhoneNumber,
+                Address = request.Address
+            },
+            EmploymentInfo = new EmploymentInfo
+            {
+                HireDate = request.HireDate,
+                JobTitle = request.JobTitle,
+                Department = request.Department,
+                ManagerId = request.ManagerId,
+                EmploymentType = request.EmploymentType,
+                Status = EmploymentStatus.Pending
+            },
+            Compensation = new Compensation
+            {
+                SalaryType = request.SalaryType,
+                CurrentSalary = request.CurrentSalary,
+                Currency = "USD",
+                BonusTarget = request.BonusTarget
+            },
+            Metadata = new Metadata
+            {
+                CreatedAt = now,
+                UpdatedAt = now,
+                CreatedBy = null,
+                LastModifiedBy = null
+            }
         };
 
         // Create compensation history entry for the hire
@@ -118,11 +139,11 @@ public class EmployeeServiceImpl : IEmployeeService
             EmployeeId = employee.Id,
             EffectiveDate = request.HireDate,
             PreviousSalary = null,
-            NewSalary = request.Salary,
+            NewSalary = request.CurrentSalary,
             ChangeType = CompensationChangeType.Hire,
             ChangeReason = "Initial hire",
             ApprovedBy = null,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
 
         // Save employee, email index, and compensation history atomically using Dapr state transaction
@@ -164,67 +185,49 @@ public class EmployeeServiceImpl : IEmployeeService
         // Track old email for index cleanup
         string? oldEmail = null;
 
-        // Update only the provided fields
+        // Update only the provided fields in PersonalInfo
         if (!string.IsNullOrWhiteSpace(request.FirstName))
         {
-            employee.FirstName = request.FirstName;
+            employee.PersonalInfo.FirstName = request.FirstName;
         }
 
         if (!string.IsNullOrWhiteSpace(request.LastName))
         {
-            employee.LastName = request.LastName;
+            employee.PersonalInfo.LastName = request.LastName;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Email))
+        if (request.PhoneNumber != null)
         {
-            // Check if email is changing
-            if (!string.Equals(employee.Email, request.Email, StringComparison.OrdinalIgnoreCase))
-            {
-                // Check if new email already exists
-                var newEmailIndexKey = $"{EmailIndexPrefix}{request.Email.ToLowerInvariant()}";
-                var existingEmployeeId = await _stateStore.GetStateAsync<string>(newEmailIndexKey, cancellationToken);
-                if (existingEmployeeId != null && existingEmployeeId != employee.Id)
-                {
-                    _logger.LogWarning("Email already exists: {Email}", request.Email);
-                    throw new EmailAlreadyExistsException(request.Email);
-                }
-                
-                oldEmail = employee.Email;
-            }
-            employee.Email = request.Email;
+            employee.PersonalInfo.PhoneNumber = request.PhoneNumber;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.DepartmentId))
+        if (request.Address != null)
         {
-            employee.DepartmentId = request.DepartmentId;
+            employee.PersonalInfo.Address = request.Address;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Title))
+        // Update EmploymentInfo fields
+        if (!string.IsNullOrWhiteSpace(request.JobTitle))
         {
-            employee.Title = request.Title;
+            employee.EmploymentInfo.JobTitle = request.JobTitle;
         }
 
-        if (request.Level.HasValue)
+        if (!string.IsNullOrWhiteSpace(request.Department))
         {
-            employee.Level = request.Level.Value;
+            employee.EmploymentInfo.Department = request.Department;
         }
 
-        if (request.Salary.HasValue)
+        if (request.ManagerId != null)
         {
-            employee.Salary = request.Salary.Value;
+            employee.EmploymentInfo.ManagerId = request.ManagerId;
         }
 
-        if (request.TerminationDate.HasValue)
+        if (request.EmploymentType.HasValue)
         {
-            employee.TerminationDate = request.TerminationDate.Value;
+            employee.EmploymentInfo.EmploymentType = request.EmploymentType.Value;
         }
 
-        if (request.Status.HasValue)
-        {
-            employee.Status = request.Status.Value;
-        }
-
-        employee.UpdatedAt = DateTime.UtcNow;
+        employee.Metadata.UpdatedAt = DateTime.UtcNow;
 
         // Save employee
         await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
@@ -237,10 +240,10 @@ public class EmployeeServiceImpl : IEmployeeService
             await _stateStore.DeleteStateAsync(oldEmailIndexKey, cancellationToken);
             
             // Create new email index
-            var newEmailIndexKey = $"{EmailIndexPrefix}{employee.Email.ToLowerInvariant()}";
+            var newEmailIndexKey = $"{EmailIndexPrefix}{employee.PersonalInfo.Email.ToLowerInvariant()}";
             await _stateStore.SaveStateAsync(newEmailIndexKey, employee.Id, cancellationToken);
             
-            _logger.LogInformation("Email index updated for employee {Id}: {OldEmail} -> {NewEmail}", employee.Id, oldEmail, employee.Email);
+            _logger.LogInformation("Email index updated for employee {Id}: {OldEmail} -> {NewEmail}", employee.Id, oldEmail, employee.PersonalInfo.Email);
         }
         
         _logger.LogInformation("Employee updated: {Id}", employee.Id);
@@ -259,15 +262,15 @@ public class EmployeeServiceImpl : IEmployeeService
         }
 
         // Soft delete: update status to Terminated
-        employee.Status = EmploymentStatus.Terminated;
-        employee.TerminationDate = DateTime.UtcNow;
-        employee.UpdatedAt = DateTime.UtcNow;
+        employee.EmploymentInfo.Status = EmploymentStatus.Terminated;
+        employee.EmploymentInfo.TerminationDate = DateTime.UtcNow;
+        employee.Metadata.UpdatedAt = DateTime.UtcNow;
 
         await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
         
         // Note: Email index is NOT deleted on soft delete to prevent email reuse
         // For hard delete implementation, add:
-        // var emailIndexKey = $"{EmailIndexPrefix}{employee.Email.ToLowerInvariant()}";
+        // var emailIndexKey = $"{EmailIndexPrefix}{employee.PersonalInfo.Email.ToLowerInvariant()}";
         // await _stateStore.DeleteStateAsync(emailIndexKey, cancellationToken);
         
         _logger.LogInformation("Employee soft deleted: {Id}", employee.Id);
@@ -304,20 +307,20 @@ public class EmployeeServiceImpl : IEmployeeService
         {
             if (Enum.TryParse<EmploymentStatus>(status, true, out var statusEnum))
             {
-                filteredEmployees = filteredEmployees.Where(e => e.Status == statusEnum);
+                filteredEmployees = filteredEmployees.Where(e => e.EmploymentInfo.Status == statusEnum);
             }
         }
         
         if (!string.IsNullOrWhiteSpace(departmentId))
         {
             filteredEmployees = filteredEmployees.Where(e => 
-                string.Equals(e.DepartmentId, departmentId, StringComparison.OrdinalIgnoreCase));
+                string.Equals(e.EmploymentInfo.Department, departmentId, StringComparison.OrdinalIgnoreCase));
         }
         
         // Sort by LastName, FirstName ascending
         var sortedEmployees = filteredEmployees
-            .OrderBy(e => e.LastName)
-            .ThenBy(e => e.FirstName)
+            .OrderBy(e => e.PersonalInfo.LastName)
+            .ThenBy(e => e.PersonalInfo.FirstName)
             .ToList();
         
         var totalCount = sortedEmployees.Count;
@@ -329,29 +332,23 @@ public class EmployeeServiceImpl : IEmployeeService
             .Take(pageSize)
             .ToList();
         
-        // Fetch all departments once for efficiency
-        var departments = await _departmentService.GetAllAsync(cancellationToken);
-        var departmentDict = departments.ToDictionary(d => d.Id, d => d.Name);
-        
-        // Create EmployeeSummary list with actual department names
+        // Create EmployeeSummary list
         // Map internal status to OpenAPI spec status
         var employeeSummaries = pagedEmployees.Select(employee => new EmployeeSummary
         {
             Id = employee.Id,
             EmployeeNumber = employee.EmployeeNumber,
-            FullName = $"{employee.FirstName} {employee.LastName}",
-            Email = employee.Email,
-            JobTitle = employee.Title,
-            Department = departmentDict.TryGetValue(employee.DepartmentId, out var deptName) 
-                ? deptName 
-                : employee.DepartmentId,
-            Status = employee.Status switch
+            FullName = $"{employee.PersonalInfo.FirstName} {employee.PersonalInfo.LastName}",
+            Email = employee.PersonalInfo.Email,
+            JobTitle = employee.EmploymentInfo.JobTitle,
+            Department = employee.EmploymentInfo.Department,
+            Status = employee.EmploymentInfo.Status switch
             {
                 EmploymentStatus.Pending => "Onboarding",
                 EmploymentStatus.Active => "Active",
                 EmploymentStatus.Terminated => "Inactive",
                 EmploymentStatus.OnLeave => "Active", // Map OnLeave to Active for API
-                _ => employee.Status.ToString()
+                _ => employee.EmploymentInfo.Status.ToString()
             }
         }).ToList();
         

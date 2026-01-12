@@ -15,11 +15,6 @@ public class EmployeesController : ControllerBase
     private readonly IDepartmentService _departmentService;
     private readonly ILogger<EmployeesController> _logger;
 
-    // Constants for default values
-    private const string DefaultEmploymentType = "FullTime";
-    private const string DefaultSalaryType = "Annual";
-    private const string DefaultCurrency = "USD";
-
     public EmployeesController(
         IEmployeeService employeeService,
         IDepartmentService departmentService,
@@ -51,15 +46,18 @@ public class EmployeesController : ControllerBase
                 return BadRequest(ErrorResponse.ValidationError(errors, HttpContext.TraceIdentifier));
             }
 
-            // Validate department exists
-            var department = await _departmentService.GetByIdAsync(request.DepartmentId, cancellationToken);
+            // Validate department exists (request.Department is now a string name)
+            var departments = await _departmentService.GetAllAsync(cancellationToken);
+            var department = departments.FirstOrDefault(d => 
+                string.Equals(d.Name, request.Department, StringComparison.OrdinalIgnoreCase));
+            
             if (department == null)
             {
-                _logger.LogWarning("Department not found: {DepartmentId}", request.DepartmentId);
+                _logger.LogWarning("Department not found: {Department}", request.Department);
                 return BadRequest(ErrorResponse.ValidationError(
                     new Dictionary<string, string[]>
                     {
-                        ["DepartmentId"] = new[] { $"Department with ID '{request.DepartmentId}' does not exist" }
+                        ["Department"] = new[] { $"Department '{request.Department}' does not exist" }
                     },
                     HttpContext.TraceIdentifier
                 ));
@@ -197,7 +195,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("{employeeId}")]
-    public async Task<ActionResult<EmployeeDto>> GetEmployee(string employeeId, CancellationToken cancellationToken)
+    public async Task<ActionResult<Employee>> GetEmployee(string employeeId, CancellationToken cancellationToken)
     {
         try
         {
@@ -210,73 +208,12 @@ public class EmployeesController : ControllerBase
                 return NotFound(ErrorResponse.NotFound("Employee", HttpContext.TraceIdentifier));
             }
 
-            // Get department name
-            var department = await _departmentService.GetByIdAsync(employee.DepartmentId, cancellationToken);
-            var departmentName = department?.Name ?? employee.DepartmentId;
-            
-            if (department == null)
-            {
-                _logger.LogWarning(
-                    "Department not found for employee {EmployeeId}, using department ID {DepartmentId} as name",
-                    employeeId, employee.DepartmentId);
-            }
-
-            // Map to DTO matching OpenAPI spec structure
-            var employeeDto = new EmployeeDto
-            {
-                Id = employee.Id,
-                EmployeeNumber = employee.EmployeeNumber,
-                PersonalInfo = new PersonalInfo
-                {
-                    FirstName = employee.FirstName,
-                    LastName = employee.LastName,
-                    Email = employee.Email,
-                    PhoneNumber = null, // Not in current Employee model
-                    Address = null // Not in current Employee model
-                },
-                EmploymentInfo = new EmploymentInfo
-                {
-                    HireDate = employee.HireDate,
-                    JobTitle = employee.Title,
-                    Department = departmentName,
-                    ManagerId = null, // Not in current Employee model
-                    EmploymentType = DefaultEmploymentType,
-                    Status = MapEmploymentStatus(employee.Status)
-                },
-                Compensation = new Compensation
-                {
-                    SalaryType = DefaultSalaryType,
-                    CurrentSalary = employee.Salary,
-                    Currency = DefaultCurrency,
-                    BonusTarget = null // Not in current Employee model
-                },
-                Metadata = new Metadata
-                {
-                    CreatedAt = employee.CreatedAt,
-                    UpdatedAt = employee.UpdatedAt,
-                    CreatedBy = null, // Not in current Employee model
-                    LastModifiedBy = null // Not in current Employee model
-                }
-            };
-
-            return Ok(employeeDto);
+            return Ok(employee);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting employee: {EmployeeId}", employeeId);
             return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext.TraceIdentifier));
         }
-    }
-
-    private static string MapEmploymentStatus(EmploymentStatus status)
-    {
-        return status switch
-        {
-            EmploymentStatus.Pending => "Onboarding",
-            EmploymentStatus.Active => "Active",
-            EmploymentStatus.Terminated => "Inactive",
-            EmploymentStatus.OnLeave => "Active",
-            _ => status.ToString()
-        };
     }
 }
