@@ -22,6 +22,7 @@ public class EmployeeServiceImpl : IEmployeeService
     private readonly ILogger<EmployeeServiceImpl> _logger;
     private const string EmployeePrefix = "employee:";
     private const string EmailIndexPrefix = "email-index:";
+    private const string EmployeeCounterPrefix = "employee-counter:";
 
     public EmployeeServiceImpl(IDaprStateStore stateStore, ILogger<EmployeeServiceImpl> logger)
     {
@@ -56,7 +57,7 @@ public class EmployeeServiceImpl : IEmployeeService
 
     public async Task<Employee> CreateAsync(CreateEmployeeRequest request, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating employee: {EmployeeNumber}", request.EmployeeNumber);
+        _logger.LogInformation("Creating employee");
         
         // Validate the request
         var validationContext = new ValidationContext(request);
@@ -77,10 +78,14 @@ public class EmployeeServiceImpl : IEmployeeService
             throw new EmailAlreadyExistsException(request.Email);
         }
         
+        // Auto-generate employee number
+        var employeeNumber = await GenerateEmployeeNumberAsync(cancellationToken);
+        _logger.LogInformation("Generated employee number: {EmployeeNumber}", employeeNumber);
+        
         var employee = new Employee
         {
             Id = Guid.NewGuid().ToString(),
-            EmployeeNumber = request.EmployeeNumber,
+            EmployeeNumber = employeeNumber,
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
@@ -243,5 +248,17 @@ public class EmployeeServiceImpl : IEmployeeService
         
         _logger.LogInformation("Query returned {Count} employees", employees.Count());
         return employees;
+    }
+
+    private async Task<string> GenerateEmployeeNumberAsync(CancellationToken cancellationToken = default)
+    {
+        var year = DateTime.UtcNow.Year;
+        var counterKey = $"{EmployeeCounterPrefix}{year}";
+        
+        var counter = await _stateStore.IncrementCounterAsync(counterKey, cancellationToken);
+        
+        // Format: EMP{year}{sequential:000000}
+        // Example: EMP2026001, EMP2026002, etc.
+        return $"EMP{year}{counter:D6}";
     }
 }
