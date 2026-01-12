@@ -15,6 +15,11 @@ public class EmployeesController : ControllerBase
     private readonly IDepartmentService _departmentService;
     private readonly ILogger<EmployeesController> _logger;
 
+    // Constants for default values
+    private const string DefaultEmploymentType = "FullTime";
+    private const string DefaultSalaryType = "Annual";
+    private const string DefaultCurrency = "USD";
+
     public EmployeesController(
         IEmployeeService employeeService,
         IDepartmentService departmentService,
@@ -208,6 +213,13 @@ public class EmployeesController : ControllerBase
             // Get department name
             var department = await _departmentService.GetByIdAsync(employee.DepartmentId, cancellationToken);
             var departmentName = department?.Name ?? employee.DepartmentId;
+            
+            if (department == null)
+            {
+                _logger.LogWarning(
+                    "Department not found for employee {EmployeeId}, using department ID {DepartmentId} as name",
+                    employeeId, employee.DepartmentId);
+            }
 
             // Map to DTO matching OpenAPI spec structure
             var employeeDto = new EmployeeDto
@@ -228,14 +240,14 @@ public class EmployeesController : ControllerBase
                     JobTitle = employee.Title,
                     Department = departmentName,
                     ManagerId = null, // Not in current Employee model
-                    EmploymentType = "FullTime", // Default, not in current Employee model
+                    EmploymentType = DefaultEmploymentType,
                     Status = MapEmploymentStatus(employee.Status)
                 },
                 Compensation = new Compensation
                 {
-                    SalaryType = "Annual", // Default, not in current Employee model
+                    SalaryType = DefaultSalaryType,
                     CurrentSalary = employee.Salary,
-                    Currency = "USD",
+                    Currency = DefaultCurrency,
                     BonusTarget = null // Not in current Employee model
                 },
                 Metadata = new Metadata
