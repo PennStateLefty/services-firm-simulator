@@ -146,7 +146,113 @@ public class EmployeeService
 
 ---
 
-## 4. Contract Testing for .NET RESTful APIs
+## 3.1. Atomic Transactions for Multi-Entity Operations
+
+### Decision: Use Dapr State Transactions for Multi-Entity Consistency
+
+**Date**: 2026-01-12  
+**Context**: During implementation of employee onboarding (T039), we identified that creating an employee requires saving three related entities atomically: the Employee record, an email index for uniqueness enforcement, and a CompensationHistory record for audit trail. Sequential saves created a risk of partial failures leaving the system in an inconsistent state.
+
+**Rationale**:
+- Dapr's `ExecuteStateTransactionAsync` API provides true atomic transactions across multiple state operations
+- Ensures all-or-nothing consistency: either all three entities are saved or none are
+- Eliminates risk of orphaned records (e.g., employee without compensation history)
+- Works with any Dapr-compatible state store that supports transactions (Redis, Cosmos DB, PostgreSQL)
+- Maintains state store abstraction for testability and portability
+
+**Implementation Pattern**:
+```csharp
+// EmployeeService.CreateAsync
+var operations = new List<(string key, object value)>
+{
+    ($"employee:{employee.Id}", employee),
+    ($"email-index:{email}", employee.Id),
+    ($"compensation-history:{compensationHistory.Id}", compensationHistory)
+};
+
+await _daprClient.ExecuteStateTransactionAsync("statestore", operations, cancellationToken);
+```
+
+**Interface Design**:
+```csharp
+public interface IDaprStateStore
+{
+    // ... existing methods ...
+    Task ExecuteStateTransactionAsync(
+        IEnumerable<(string key, object value)> operations, 
+        CancellationToken cancellationToken = default
+    );
+}
+
+public class DaprStateStore : IDaprStateStore
+{
+    public async Task ExecuteStateTransactionAsync(
+        IEnumerable<(string key, object value)> operations, 
+        CancellationToken cancellationToken = default)
+    {
+        var transactionRequests = new List<StateTransactionRequest>();
+        
+        foreach (var (key, value) in operations)
+        {
+            var serializedValue = JsonSerializer.SerializeToUtf8Bytes(value);
+            transactionRequests.Add(new StateTransactionRequest(
+                key, 
+                serializedValue, 
+                StateOperationType.Upsert
+            ));
+        }
+        
+        await _daprClient.ExecuteStateTransactionAsync(
+            StateStoreName, 
+            transactionRequests, 
+            cancellationToken: cancellationToken
+        );
+    }
+}
+```
+
+**Benefits**:
+- **Data Integrity**: Prevents partial writes that could corrupt business state
+- **Audit Compliance**: CompensationHistory is always created with Employee, ensuring complete audit trail
+- **Simplified Error Handling**: Single transaction success/failure instead of handling partial failure scenarios
+- **Performance**: Single round-trip to state store instead of multiple sequential calls
+- **Cloud-Native**: Leverages Dapr's native capabilities without custom transaction management code
+
+**Trade-offs**:
+- **State Store Compatibility**: Requires a state store that supports transactions (Redis, Cosmos DB, PostgreSQL support it; some others may not)
+- **Transaction Scope**: Limited to single state store; cannot span multiple state stores or external systems
+- **Serialization Overhead**: All values serialized to bytes before transaction execution
+
+**Use Cases**:
+- ✅ Employee creation with CompensationHistory and email index
+- ✅ Future: Performance review submission with multiple related entities
+- ✅ Future: Merit cycle processing with multiple compensation adjustments
+- ❌ Not suitable for: Long-running workflows spanning multiple services (use Sagas/orchestration instead)
+
+**Testing Strategy**:
+- Unit tests mock `ExecuteStateTransactionAsync` to verify correct operations are bundled
+- Integration tests use TestContainers with Redis to verify actual transaction behavior
+- Contract tests ensure transaction failures don't leak partial state
+
+**Alternatives Considered**:
+- **Sequential SaveStateAsync calls**: Original approach; rejected due to partial failure risk
+- **Saga pattern with compensating transactions**: Rejected as overengineering for single-service operations
+- **Two-phase commit (2PC)**: Rejected as Dapr doesn't support 2PC and it adds complexity
+- **Eventual consistency with event reconciliation**: Rejected as employee creation requires immediate consistency for UX and audit requirements
+
+**Migration Notes**:
+- Existing code using sequential saves should be reviewed and migrated to transactions where atomicity is required
+- Services already deployed continue to work; new deployments benefit from transactional consistency
+- No state store configuration changes required (Redis and Cosmos DB support transactions by default)
+
+**Related**:
+- Implementation: `src/EmployeeService/Infrastructure/DaprStateStore.cs`
+- Issue: T039 - Create CompensationHistory on hire
+- PR: copilot/create-compensation-history-on-hire
+
+---
+
+## 5. Contract Testing for .NET RESTful APIs
 
 ### Decision: Use Pact.NET for Consumer-Driven Contract Testing
 
@@ -210,7 +316,7 @@ public void VerifyEmployeeServiceContracts()
 
 ---
 
-## 5. Minimal React Architecture for RESTful API Consumption
+## 6. Minimal React Architecture for RESTful API Consumption
 
 ### Decision: React + React Router + Native Fetch with Custom Hooks
 
@@ -296,7 +402,7 @@ export function useEmployee(employeeId: string) {
 
 ---
 
-## 6. Service Decomposition Strategy
+## 7. Service Decomposition Strategy
 
 ### Decision: 5 Core Services Aligned with HR Domains
 
@@ -348,7 +454,7 @@ export function useEmployee(employeeId: string) {
 
 ---
 
-## 7. Testing Strategy
+## 8. Testing Strategy
 
 ### Decision: 3-Tier Testing Pyramid with Contract Tests
 
@@ -423,7 +529,7 @@ export function useEmployee(employeeId: string) {
 
 ---
 
-## 8. Local Development Experience
+## 9. Local Development Experience
 
 ### Decision: Aspire AppHost with Hot Reload and Aspire Dashboard
 
@@ -452,7 +558,7 @@ export function useEmployee(employeeId: string) {
 
 ---
 
-## 9. Deployment and Infrastructure
+## 10. Deployment and Infrastructure
 
 ### Decision: Azure Container Apps with Bicep IaC
 
