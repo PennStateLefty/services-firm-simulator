@@ -216,4 +216,70 @@ public class EmployeesController : ControllerBase
             return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext.TraceIdentifier));
         }
     }
+
+    [HttpPut("{employeeId}")]
+    public async Task<ActionResult<Employee>> UpdateEmployee(
+        string employeeId,
+        [FromBody] UpdateEmployeeRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("Updating employee: {EmployeeId}", employeeId);
+
+            // Validate required fields
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(x => x.Value?.Errors.Count > 0)
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value?.Errors.Select(e => e.ErrorMessage).ToArray() ?? Array.Empty<string>()
+                    );
+                return BadRequest(ErrorResponse.ValidationError(errors, HttpContext.TraceIdentifier));
+            }
+
+            // Validate department exists if department is being changed
+            if (!string.IsNullOrWhiteSpace(request.Department))
+            {
+                var departments = await _departmentService.GetAllAsync(cancellationToken);
+                var department = departments.FirstOrDefault(d => 
+                    string.Equals(d.Name, request.Department, StringComparison.OrdinalIgnoreCase));
+                
+                if (department == null)
+                {
+                    _logger.LogWarning("Department not found: {Department}", request.Department);
+                    return BadRequest(ErrorResponse.ValidationError(
+                        new Dictionary<string, string[]>
+                        {
+                            ["Department"] = new[] { $"Department '{request.Department}' does not exist" }
+                        },
+                        HttpContext.TraceIdentifier
+                    ));
+                }
+            }
+
+            // Update employee
+            var employee = await _employeeService.UpdateAsync(employeeId, request, cancellationToken);
+
+            _logger.LogInformation("Employee updated successfully: {EmployeeId}", employeeId);
+
+            return Ok(employee);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            _logger.LogWarning(ex, "Employee not found: {EmployeeId}", employeeId);
+            return NotFound(ErrorResponse.NotFound("Employee", HttpContext.TraceIdentifier));
+        }
+        catch (ValidationException ex)
+        {
+            _logger.LogWarning(ex, "Validation error during employee update");
+            return BadRequest(ErrorResponse.Create(400, "Validation failed", ex.Message, HttpContext.TraceIdentifier));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating employee: {EmployeeId}", employeeId);
+            return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
 }
