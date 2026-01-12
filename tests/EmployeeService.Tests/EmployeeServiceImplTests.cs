@@ -117,9 +117,8 @@ public class EmployeeServiceTests
         Assert.Equal(request.FirstName, result.FirstName);
         Assert.Equal(request.LastName, result.LastName);
         Assert.Equal(request.Email, result.Email);
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("employee:")),
-            It.IsAny<Employee>(),
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -369,14 +368,19 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("employee:") && k.Contains(result.Id)),
-            It.IsAny<Employee>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(capturedOperations);
+        Assert.Contains(capturedOperations, op => op.key.StartsWith("employee:") && op.key.Contains(result.Id));
     }
 
     [Fact]
@@ -406,9 +410,8 @@ public class EmployeeServiceTests
         Assert.Equal(email, exception.Email);
         Assert.Contains(email, exception.Message);
         
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("employee:")),
-            It.IsAny<Employee>(),
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -437,14 +440,19 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            $"email-index:{request.Email.ToLowerInvariant()}",
-            result.Id,
-            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(capturedOperations);
+        Assert.Contains(capturedOperations, op => op.key == $"email-index:{request.Email.ToLowerInvariant()}" && op.value.ToString() == result.Id);
     }
 
     [Fact]
@@ -809,5 +817,202 @@ public class EmployeeServiceTests
         var sequential1 = int.Parse(result1.EmployeeNumber[^6..]);
         var sequential2 = int.Parse(result2.EmployeeNumber[^6..]);
         Assert.True(sequential1 < sequential2, "Sequential numbers should be in ascending order");
+    }
+
+    [Fact]
+    public async Task CreateAsync_CreatesCompensationHistory()
+    {
+        // Arrange
+        var hireDate = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var salary = 120000.00m;
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john.doe@example.com",
+            DepartmentId = "dept-123",
+            Title = "Software Engineer",
+            Level = 5,
+            Salary = salary,
+            HireDate = hireDate,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _employeeService.CreateAsync(request);
+
+        // Assert
+        Assert.NotNull(capturedOperations);
+        var compensationHistoryOp = capturedOperations.FirstOrDefault(op => op.key.StartsWith("compensation-history:"));
+        Assert.NotEqual(default, compensationHistoryOp);
+        
+        var savedCompensationHistory = compensationHistoryOp.value as CompensationHistory;
+        Assert.NotNull(savedCompensationHistory);
+        Assert.Equal(result.Id, savedCompensationHistory.EmployeeId);
+        Assert.Equal(hireDate, savedCompensationHistory.EffectiveDate);
+        Assert.Null(savedCompensationHistory.PreviousSalary);
+        Assert.Equal(salary, savedCompensationHistory.NewSalary);
+        Assert.Equal(CompensationChangeType.Hire, savedCompensationHistory.ChangeType);
+        Assert.Equal("Initial hire", savedCompensationHistory.ChangeReason);
+        Assert.Null(savedCompensationHistory.ApprovedBy);
+    }
+
+    [Fact]
+    public async Task CreateAsync_CompensationHistory_HasCorrectFieldMapping()
+    {
+        // Arrange
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith",
+            Email = "jane.smith@example.com",
+            DepartmentId = "dept-456",
+            Level = 7,
+            Salary = 150000.00m,
+            HireDate = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = EmploymentStatus.Pending
+        };
+
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await _employeeService.CreateAsync(request);
+
+        // Assert
+        Assert.NotNull(capturedOperations);
+        var compensationHistoryOp = capturedOperations.FirstOrDefault(op => op.key.StartsWith("compensation-history:"));
+        Assert.NotEqual(default, compensationHistoryOp);
+        
+        var capturedHistory = compensationHistoryOp.value as CompensationHistory;
+        Assert.NotNull(capturedHistory);
+        Assert.NotEmpty(capturedHistory.Id);
+        Assert.Equal(result.Id, capturedHistory.EmployeeId);
+        Assert.Equal(request.HireDate, capturedHistory.EffectiveDate);
+        Assert.Null(capturedHistory.PreviousSalary);
+        Assert.Equal(request.Salary, capturedHistory.NewSalary);
+        Assert.Equal(CompensationChangeType.Hire, capturedHistory.ChangeType);
+        Assert.Equal("Initial hire", capturedHistory.ChangeReason);
+        Assert.Null(capturedHistory.ApprovedBy);
+    }
+
+    [Fact]
+    public async Task CreateAsync_CompensationHistory_SavedWithCorrectKey()
+    {
+        // Arrange
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "Bob",
+            LastName = "Johnson",
+            Email = "bob.j@example.com",
+            DepartmentId = "dept-789",
+            Level = 4,
+            Salary = 90000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await _employeeService.CreateAsync(request);
+
+        // Assert
+        Assert.NotNull(capturedOperations);
+        var compensationHistoryOp = capturedOperations.FirstOrDefault(op => op.key.StartsWith("compensation-history:"));
+        Assert.NotEqual(default, compensationHistoryOp);
+        
+        var capturedHistory = compensationHistoryOp.value as CompensationHistory;
+        Assert.NotNull(capturedHistory);
+        Assert.StartsWith("compensation-history:", compensationHistoryOp.key);
+        Assert.Contains(capturedHistory.Id, compensationHistoryOp.key);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidationFailure_DoesNotCreateCompensationHistory()
+    {
+        // Arrange
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "Invalid",
+            LastName = "User",
+            Email = "not-an-email", // Invalid email
+            DepartmentId = "dept-123",
+            Level = 5,
+            Salary = 100000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ValidationException>(() => _employeeService.CreateAsync(request));
+
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DuplicateEmail_DoesNotCreateCompensationHistory()
+    {
+        // Arrange
+        var existingEmployeeId = "existing-id";
+        var email = "duplicate@example.com";
+        
+        _mockStateStore.Setup(x => x.GetStateAsync<string>($"email-index:{email.ToLowerInvariant()}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingEmployeeId);
+
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith",
+            Email = email,
+            DepartmentId = "dept-123",
+            Level = 5,
+            Salary = 100000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Act & Assert
+        await Assert.ThrowsAsync<EmailAlreadyExistsException>(() => _employeeService.CreateAsync(request));
+
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 }

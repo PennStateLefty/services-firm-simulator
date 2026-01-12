@@ -10,6 +10,7 @@ public interface IDaprStateStore
     Task DeleteStateAsync(string key, CancellationToken cancellationToken = default);
     Task<IEnumerable<T>> QueryStateAsync<T>(string queryString, CancellationToken cancellationToken = default) where T : class;
     Task<int> IncrementCounterAsync(string key, CancellationToken cancellationToken = default);
+    Task ExecuteStateTransactionAsync(IEnumerable<(string key, object value)> operations, CancellationToken cancellationToken = default);
 }
 
 public class DaprStateStore : IDaprStateStore
@@ -150,5 +151,30 @@ public class DaprStateStore : IDaprStateStore
         }
 
         throw new InvalidOperationException($"Failed to increment counter for key '{key}' after {maxRetries} attempts due to high contention.");
+    }
+
+    public async Task ExecuteStateTransactionAsync(IEnumerable<(string key, object value)> operations, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogDebug("Executing state transaction with {Count} operations", operations.Count());
+            
+            var transactionRequests = new List<StateTransactionRequest>();
+            
+            foreach (var (key, value) in operations)
+            {
+                var serializedValue = JsonSerializer.SerializeToUtf8Bytes(value);
+                transactionRequests.Add(new StateTransactionRequest(key, serializedValue, StateOperationType.Upsert));
+            }
+            
+            await _daprClient.ExecuteStateTransactionAsync(StateStoreName, transactionRequests, cancellationToken: cancellationToken);
+            
+            _logger.LogDebug("Successfully executed state transaction with {Count} operations", operations.Count());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing state transaction");
+            throw;
+        }
     }
 }

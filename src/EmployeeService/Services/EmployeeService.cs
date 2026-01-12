@@ -23,6 +23,7 @@ public class EmployeeServiceImpl : IEmployeeService
     private const string EmployeePrefix = "employee:";
     private const string EmailIndexPrefix = "email-index:";
     private const string EmployeeCounterPrefix = "employee-counter:";
+    private const string CompensationHistoryPrefix = "compensation-history:";
 
     public EmployeeServiceImpl(IDaprStateStore stateStore, ILogger<EmployeeServiceImpl> logger)
     {
@@ -99,11 +100,32 @@ public class EmployeeServiceImpl : IEmployeeService
             UpdatedAt = DateTime.UtcNow
         };
 
-        // Save employee and email index atomically
-        await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
-        await _stateStore.SaveStateAsync(emailIndexKey, employee.Id, cancellationToken);
+        // Create compensation history entry for the hire
+        var compensationHistory = new CompensationHistory
+        {
+            Id = Guid.NewGuid().ToString(),
+            EmployeeId = employee.Id,
+            EffectiveDate = request.HireDate,
+            PreviousSalary = null,
+            NewSalary = request.Salary,
+            ChangeType = CompensationChangeType.Hire,
+            ChangeReason = "Initial hire",
+            ApprovedBy = null,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Save employee, email index, and compensation history atomically using Dapr state transaction
+        // This ensures either all three operations succeed or all fail, maintaining consistency
+        var operations = new List<(string key, object value)>
+        {
+            ($"{EmployeePrefix}{employee.Id}", employee),
+            (emailIndexKey, employee.Id),
+            ($"{CompensationHistoryPrefix}{compensationHistory.Id}", compensationHistory)
+        };
         
-        _logger.LogInformation("Employee created: {Id}", employee.Id);
+        await _stateStore.ExecuteStateTransactionAsync(operations, cancellationToken);
+        
+        _logger.LogInformation("Employee created: {Id} with compensation history: {CompensationHistoryId}", employee.Id, compensationHistory.Id);
         return employee;
     }
 
