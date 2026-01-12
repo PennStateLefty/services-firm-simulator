@@ -8,6 +8,19 @@ public enum EmploymentStatus
     Terminated
 }
 
+public enum EmploymentType
+{
+    FullTime,
+    PartTime,
+    Contract
+}
+
+public enum SalaryType
+{
+    Annual,
+    Hourly
+}
+
 public enum CompetencyType
 {
     TechnicalExpertise,

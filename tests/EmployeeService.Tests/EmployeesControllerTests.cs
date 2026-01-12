@@ -46,12 +46,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department
@@ -67,10 +67,10 @@ public class EmployeesControllerTests
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
-            DepartmentId = request.DepartmentId,
-            Title = request.Title,
+            Department = request.DepartmentId,
+            JobTitle = request.Title,
             Level = request.Level,
-            Salary = request.Salary,
+            CurrentSalary = request.Salary,
             HireDate = request.HireDate,
             Status = request.Status
         };
@@ -93,7 +93,7 @@ public class EmployeesControllerTests
         
         var returnedEmployee = Assert.IsType<Employee>(createdResult.Value);
         Assert.Equal(createdEmployee.Id, returnedEmployee.Id);
-        Assert.Equal(createdEmployee.Email, returnedEmployee.Email);
+        Assert.Equal(createdEmployee.Email, returnedEmployee.PersonalInfo.Email);
     }
 
     [Fact]
@@ -105,12 +105,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "non-existent-dept",
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "non-existent-dept",
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         _mockDepartmentService.Setup(x => x.GetByIdAsync(request.DepartmentId, It.IsAny<CancellationToken>()))
@@ -139,12 +139,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "existing@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -177,12 +177,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "invalid-email",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -214,12 +214,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -246,6 +246,7 @@ public class EmployeesControllerTests
     {
         // Arrange
         var employeeId = "emp-123";
+        var departmentId = "dept-123";
         var employee = new Employee
         {
             Id = employeeId,
@@ -253,12 +254,25 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            CurrentSalary = 100000m,
+            HireDate = new DateTime(2026, 1, 1),
+            CreatedAt = new DateTime(2026, 1, 1),
+            UpdatedAt = new DateTime(2026, 1, 1)
+        };
+
+        var department = new Department
+        {
+            Id = departmentId,
+            Name = "Engineering"
         };
 
         _mockEmployeeService.Setup(x => x.GetByIdAsync(employeeId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(employee);
+
+        _mockDepartmentService.Setup(x => x.GetByIdAsync(departmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(department);
 
         // Act
         var result = await _controller.GetEmployee(employeeId, CancellationToken.None);
@@ -267,9 +281,33 @@ public class EmployeesControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Equal(200, okResult.StatusCode);
         
-        var returnedEmployee = Assert.IsType<Employee>(okResult.Value);
-        Assert.Equal(employeeId, returnedEmployee.Id);
-        Assert.Equal("john.doe@example.com", returnedEmployee.Email);
+        var returnedDto = Assert.IsType<EmployeeDto>(okResult.Value);
+        Assert.Equal(employeeId, returnedDto.Id);
+        Assert.Equal("EMP2026000001", returnedDto.EmployeeNumber);
+        
+        // Verify nested structure - PersonalInfo
+        Assert.NotNull(returnedDto.PersonalInfo);
+        Assert.Equal("John", returnedDto.PersonalInfo.FirstName);
+        Assert.Equal("Doe", returnedDto.PersonalInfo.LastName);
+        Assert.Equal("john.doe@example.com", returnedDto.PersonalInfo.Email);
+        
+        // Verify nested structure - EmploymentInfo
+        Assert.NotNull(returnedDto.EmploymentInfo);
+        Assert.Equal("Software Engineer", returnedDto.EmploymentInfo.JobTitle);
+        Assert.Equal("Engineering", returnedDto.EmploymentInfo.Department);
+        Assert.Equal("Active", returnedDto.EmploymentInfo.Status);
+        Assert.Equal(new DateTime(2026, 1, 1), returnedDto.EmploymentInfo.HireDate);
+        
+        // Verify nested structure - Compensation
+        Assert.NotNull(returnedDto.Compensation);
+        Assert.Equal(100000m, returnedDto.Compensation.CurrentSalary);
+        Assert.Equal("USD", returnedDto.Compensation.Currency);
+        Assert.Equal("Annual", returnedDto.Compensation.SalaryType);
+        
+        // Verify nested structure - Metadata
+        Assert.NotNull(returnedDto.Metadata);
+        Assert.Equal(new DateTime(2026, 1, 1), returnedDto.Metadata.CreatedAt);
+        Assert.Equal(new DateTime(2026, 1, 1), returnedDto.Metadata.UpdatedAt);
     }
 
     [Fact]
@@ -323,12 +361,12 @@ public class EmployeesControllerTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "jane.smith@example.com",
-            DepartmentId = departmentId,
-            Title = "Senior Engineer",
-            Level = 6,
-            Salary = 120000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Senior Engineer",
+            // Level property removed,
+            CurrentSalary = 120000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -340,7 +378,7 @@ public class EmployeesControllerTests
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
-            DepartmentId = request.DepartmentId,
+            Department = request.DepartmentId,
             Status = request.Status
         };
 

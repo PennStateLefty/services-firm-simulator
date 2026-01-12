@@ -46,15 +46,18 @@ public class EmployeesController : ControllerBase
                 return BadRequest(ErrorResponse.ValidationError(errors, HttpContext.TraceIdentifier));
             }
 
-            // Validate department exists
-            var department = await _departmentService.GetByIdAsync(request.DepartmentId, cancellationToken);
+            // Validate department exists (request.Department is now a string name)
+            var departments = await _departmentService.GetAllAsync(cancellationToken);
+            var department = departments.FirstOrDefault(d => 
+                string.Equals(d.Name, request.Department, StringComparison.OrdinalIgnoreCase));
+            
             if (department == null)
             {
-                _logger.LogWarning("Department not found: {DepartmentId}", request.DepartmentId);
+                _logger.LogWarning("Department not found: {Department}", request.Department);
                 return BadRequest(ErrorResponse.ValidationError(
                     new Dictionary<string, string[]>
                     {
-                        ["DepartmentId"] = new[] { $"Department with ID '{request.DepartmentId}' does not exist" }
+                        ["Department"] = new[] { $"Department '{request.Department}' does not exist" }
                     },
                     HttpContext.TraceIdentifier
                 ));

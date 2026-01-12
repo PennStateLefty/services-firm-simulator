@@ -27,21 +27,57 @@ public class EmployeeServiceTests
             _mockLogger.Object);
     }
 
+    // Helper method to create test employees with nested structure
+    private static Employee CreateTestEmployee(
+        string id = "test-id",
+        string employeeNumber = "EMP-1001",
+        string firstName = "John",
+        string lastName = "Doe",
+        string email = "john.doe@example.com",
+        string department = "Engineering",
+        string jobTitle = "Software Engineer",
+        EmploymentStatus status = EmploymentStatus.Active,
+        decimal salary = 100000m)
+    {
+        return new Employee
+        {
+            Id = id,
+            EmployeeNumber = employeeNumber,
+            PersonalInfo = new PersonalInfo
+            {
+                FirstName = firstName,
+                LastName = lastName,
+                Email = email
+            },
+            EmploymentInfo = new EmploymentInfo
+            {
+                HireDate = DateTime.UtcNow,
+                JobTitle = jobTitle,
+                Department = department,
+                EmploymentType = EmploymentType.FullTime,
+                Status = status
+            },
+            Compensation = new Compensation
+            {
+                SalaryType = SalaryType.Annual,
+                CurrentSalary = salary,
+                Currency = "USD"
+            },
+            Metadata = new Metadata
+            {
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }
+        };
+    }
+
     [Fact]
     public async Task GetByIdAsync_ExistingEmployee_ReturnsEmployee()
     {
         // Arrange
         var employeeId = "test-id";
-        var expectedEmployee = new Employee
-        {
-            Id = employeeId,
-            EmployeeNumber = "EMP-1001",
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active
-        };
+        var expectedEmployee = CreateTestEmployee(id: employeeId);
+        
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedEmployee);
 
@@ -75,8 +111,8 @@ public class EmployeeServiceTests
         // Arrange
         var employees = new List<Employee>
         {
-            new Employee { Id = "1", EmployeeNumber = "EMP-1001", FirstName = "John", LastName = "Doe", Email = "john@example.com", DepartmentId = "dept-1", Status = EmploymentStatus.Active },
-            new Employee { Id = "2", EmployeeNumber = "EMP-1002", FirstName = "Jane", LastName = "Smith", Email = "jane@example.com", DepartmentId = "dept-2", Status = EmploymentStatus.Active }
+            new Employee { Id = "1", EmployeeNumber = "EMP-1001", FirstName = "John", LastName = "Doe", Email = "john@example.com", Department = "dept-1" },
+            new Employee { Id = "2", EmployeeNumber = "EMP-1002", FirstName = "Jane", LastName = "Smith", Email = "jane@example.com", Department = "dept-2" }
         };
         _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(employees);
@@ -98,12 +134,12 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-123",
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Mock counter increment
@@ -119,9 +155,9 @@ public class EmployeeServiceTests
         Assert.NotNull(result);
         Assert.NotEmpty(result.Id);
         Assert.Matches(@"^EMP\d{4}\d{6}$", result.EmployeeNumber); // Verify format EMP{year}{sequential:000000}
-        Assert.Equal(request.FirstName, result.FirstName);
-        Assert.Equal(request.LastName, result.LastName);
-        Assert.Equal(request.Email, result.Email);
+        Assert.Equal(request.FirstName, result.PersonalInfo.FirstName);
+        Assert.Equal(request.LastName, result.PersonalInfo.LastName);
+        Assert.Equal(request.Email, result.PersonalInfo.Email);
         _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
             It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -135,12 +171,12 @@ public class EmployeeServiceTests
         {
             FirstName = "John",
             LastName = "Doe",
-            Email = "invalid-email", // Invalid email format
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            Email = "invalid-email",
+            SalaryType = SalaryType.Annual, // Invalid email format
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -163,11 +199,10 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            Status = EmploymentStatus.Active
+            Department = "dept-123",
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingEmployee);
@@ -175,8 +210,8 @@ public class EmployeeServiceTests
         var updateRequest = new UpdateEmployeeRequest
         {
             FirstName = "Jane",
-            Title = "Senior Software Engineer",
-            Level = 6
+            JobTitle = "Senior Software Engineer",
+            // Level property removed
         };
 
         // Act
@@ -184,10 +219,10 @@ public class EmployeeServiceTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("Jane", result.FirstName);
-        Assert.Equal("Senior Software Engineer", result.Title);
+        Assert.Equal("Jane", result.PersonalInfo.FirstName);
+        Assert.Equal("Senior Software Engineer", result.EmploymentInfo.JobTitle);
         Assert.Equal(6, result.Level);
-        Assert.Equal("Doe", result.LastName); // Unchanged
+        Assert.Equal("Doe", result.PersonalInfo.LastName); // Unchanged
         _mockStateStore.Verify(x => x.SaveStateAsync(
             $"employee:{employeeId}",
             It.IsAny<Employee>(),
@@ -227,8 +262,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active,
+            Department = "dept-123",
             TerminationDate = null
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
@@ -241,7 +275,7 @@ public class EmployeeServiceTests
         _mockStateStore.Verify(x => x.SaveStateAsync(
             $"employee:{employeeId}",
             It.Is<Employee>(e => 
-                e.Status == EmploymentStatus.Terminated && 
+                e.EmploymentInfo.EmploymentInfo.Status == EmploymentStatus.Terminated && 
                 e.TerminationDate != null),
             It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -269,7 +303,7 @@ public class EmployeeServiceTests
         var filter = "{\"status\":\"Active\"}";
         var employees = new List<Employee>
         {
-            new Employee { Id = "1", EmployeeNumber = "EMP-1001", FirstName = "John", LastName = "Doe", Email = "john@example.com", DepartmentId = "dept-1", Status = EmploymentStatus.Active }
+            new Employee { Id = "1", EmployeeNumber = "EMP-1001", FirstName = "John", LastName = "Doe", Email = "john@example.com", Department = "dept-1" }
         };
         _mockStateStore.Setup(x => x.QueryStateAsync<Employee>(filter, It.IsAny<CancellationToken>()))
             .ReturnsAsync(employees);
@@ -280,7 +314,7 @@ public class EmployeeServiceTests
         // Assert
         Assert.NotNull(result);
         Assert.Single(result);
-        Assert.All(result, e => Assert.Equal(EmploymentStatus.Active, e.Status));
+        Assert.All(result, e => Assert.Equal(EmploymentStatus.Active, e.EmploymentInfo.Status));
     }
 
     [Fact]
@@ -292,11 +326,11 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
         
         // Mock counter increment
@@ -328,8 +362,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active,
+            Department = "dept-123",
             CreatedAt = DateTime.UtcNow.AddDays(-10),
             UpdatedAt = DateTime.UtcNow.AddDays(-5)
         };
@@ -360,11 +393,11 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Mock counter increment
@@ -403,11 +436,10 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -429,11 +461,11 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         _mockStateStore.Setup(x => x.GetStateAsync<string>($"email-index:{request.Email.ToLowerInvariant()}", It.IsAny<CancellationToken>()))
@@ -475,11 +507,10 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -498,8 +529,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active
+            Department = "dept-123"
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingEmployee);
@@ -538,8 +568,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = oldEmail,
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active
+            Department = "dept-123"
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingEmployee);
@@ -556,7 +585,7 @@ public class EmployeeServiceTests
         var result = await _employeeService.UpdateAsync(employeeId, updateRequest);
 
         // Assert
-        Assert.Equal(newEmail, result.Email);
+        Assert.Equal(newEmail, result.PersonalInfo.Email);
         
         // Verify old index is deleted
         _mockStateStore.Verify(x => x.DeleteStateAsync(
@@ -583,8 +612,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = email,
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active
+            Department = "dept-123"
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingEmployee);
@@ -622,8 +650,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = oldEmail,
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active
+            Department = "dept-123"
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingEmployee);
@@ -641,7 +668,7 @@ public class EmployeeServiceTests
         var result = await _employeeService.UpdateAsync(employeeId, updateRequest);
 
         // Assert
-        Assert.Equal(newEmail, result.Email);
+        Assert.Equal(newEmail, result.PersonalInfo.Email);
         
         // Should not delete or recreate index since it's the same email (case-insensitive)
         _mockStateStore.Verify(x => x.DeleteStateAsync(
@@ -662,8 +689,7 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = email,
-            DepartmentId = "dept-123",
-            Status = EmploymentStatus.Active,
+            Department = "dept-123",
             TerminationDate = null
         };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
@@ -688,11 +714,11 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Mock counter increment to return 1
@@ -719,11 +745,11 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "jane.smith@example.com",
-            DepartmentId = "dept-456",
-            Level = 3,
-            Salary = 80000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-456",
+            // Level property removed,
+            CurrentSalary = 80000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Mock counter increment to return 42
@@ -752,11 +778,11 @@ public class EmployeeServiceTests
             FirstName = "Bob",
             LastName = "Johnson",
             Email = "bob.j@example.com",
-            DepartmentId = "dept-789",
-            Level = 7,
-            Salary = 150000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-789",
+            // Level property removed,
+            CurrentSalary = 150000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var currentYear = DateTime.UtcNow.Year;
@@ -783,11 +809,11 @@ public class EmployeeServiceTests
             FirstName = "Alice",
             LastName = "Anderson",
             Email = "alice@example.com",
-            DepartmentId = "dept-1",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-1",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var request2 = new CreateEmployeeRequest
@@ -795,11 +821,11 @@ public class EmployeeServiceTests
             FirstName = "Bob",
             LastName = "Brown",
             Email = "bob@example.com",
-            DepartmentId = "dept-2",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-2",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Mock counter to increment each time
@@ -835,12 +861,12 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = salary,
-            HireDate = hireDate,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-123",
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = salary,
+            HireDate = hireDate
         };
 
         // Mock counter increment
@@ -884,11 +910,11 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "jane.smith@example.com",
-            DepartmentId = "dept-456",
-            Level = 7,
-            Salary = 150000.00m,
-            HireDate = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc),
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-456",
+            // Level property removed,
+            CurrentSalary = 150000.00m,
+            HireDate = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc)
         };
 
         // Mock counter increment
@@ -933,11 +959,11 @@ public class EmployeeServiceTests
             FirstName = "Bob",
             LastName = "Johnson",
             Email = "bob.j@example.com",
-            DepartmentId = "dept-789",
-            Level = 4,
-            Salary = 90000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "dept-789",
+            // Level property removed,
+            CurrentSalary = 90000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Mock counter increment
@@ -975,12 +1001,12 @@ public class EmployeeServiceTests
         {
             FirstName = "Invalid",
             LastName = "User",
-            Email = "not-an-email", // Invalid email
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            Email = "not-an-email",
+            SalaryType = SalaryType.Annual, // Invalid email
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -1006,11 +1032,10 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            Department = "dept-123",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         // Act & Assert
@@ -1034,9 +1059,8 @@ public class EmployeeServiceTests
                 FirstName = "Alice",
                 LastName = "Anderson",
                 Email = "alice@example.com",
-                DepartmentId = "dept-1",
-                Title = "Engineer",
-                Status = EmploymentStatus.Active
+                Department = "dept-1",
+                JobTitle = "Engineer"
             },
             new Employee
             {
@@ -1045,9 +1069,8 @@ public class EmployeeServiceTests
                 FirstName = "Bob",
                 LastName = "Brown",
                 Email = "bob@example.com",
-                DepartmentId = "dept-2",
-                Title = "Designer",
-                Status = EmploymentStatus.Active
+                Department = "dept-2",
+                JobTitle = "Designer"
             }
         };
 
@@ -1086,9 +1109,8 @@ public class EmployeeServiceTests
             FirstName = $"First{i}",
             LastName = $"Last{i}",
             Email = $"emp{i}@example.com",
-            DepartmentId = "dept-1",
-            Title = "Employee",
-            Status = EmploymentStatus.Active
+            Department = "dept-1",
+            JobTitle = "Employee"
         }).ToList();
 
         var departments = new List<Department>
@@ -1127,9 +1149,8 @@ public class EmployeeServiceTests
                 FirstName = "Active",
                 LastName = "User",
                 Email = "active@example.com",
-                DepartmentId = "dept-1",
-                Title = "Engineer",
-                Status = EmploymentStatus.Active
+                Department = "dept-1",
+                JobTitle = "Engineer"
             },
             new Employee
             {
@@ -1138,9 +1159,8 @@ public class EmployeeServiceTests
                 FirstName = "Pending",
                 LastName = "User",
                 Email = "pending@example.com",
-                DepartmentId = "dept-1",
-                Title = "Engineer",
-                Status = EmploymentStatus.Pending
+                Department = "dept-1",
+                JobTitle = "Engineer"
             },
             new Employee
             {
@@ -1149,9 +1169,8 @@ public class EmployeeServiceTests
                 FirstName = "Terminated",
                 LastName = "User",
                 Email = "terminated@example.com",
-                DepartmentId = "dept-1",
-                Title = "Engineer",
-                Status = EmploymentStatus.Terminated
+                Department = "dept-1",
+                JobTitle = "Engineer"
             }
         };
 
@@ -1190,9 +1209,8 @@ public class EmployeeServiceTests
                 FirstName = "Alice",
                 LastName = "Anderson",
                 Email = "alice@example.com",
-                DepartmentId = "dept-1",
-                Title = "Engineer",
-                Status = EmploymentStatus.Active
+                Department = "dept-1",
+                JobTitle = "Engineer"
             },
             new Employee
             {
@@ -1201,9 +1219,8 @@ public class EmployeeServiceTests
                 FirstName = "Bob",
                 LastName = "Brown",
                 Email = "bob@example.com",
-                DepartmentId = "dept-2",
-                Title = "Designer",
-                Status = EmploymentStatus.Active
+                Department = "dept-2",
+                JobTitle = "Designer"
             }
         };
 
@@ -1242,8 +1259,7 @@ public class EmployeeServiceTests
                 FirstName = "Charlie",
                 LastName = "Brown",
                 Email = "charlie@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.Active
+                Department = "dept-1"
             },
             new Employee
             {
@@ -1252,8 +1268,7 @@ public class EmployeeServiceTests
                 FirstName = "Alice",
                 LastName = "Anderson",
                 Email = "alice@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.Active
+                Department = "dept-1"
             },
             new Employee
             {
@@ -1262,8 +1277,7 @@ public class EmployeeServiceTests
                 FirstName = "Bob",
                 LastName = "Anderson",
                 Email = "bob@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.Active
+                Department = "dept-1"
             }
         };
 
@@ -1302,8 +1316,7 @@ public class EmployeeServiceTests
                 FirstName = "Pending",
                 LastName = "User",
                 Email = "pending@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.Pending
+                Department = "dept-1"
             },
             new Employee
             {
@@ -1312,8 +1325,7 @@ public class EmployeeServiceTests
                 FirstName = "Active",
                 LastName = "User",
                 Email = "active@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.Active
+                Department = "dept-1"
             },
             new Employee
             {
@@ -1322,8 +1334,7 @@ public class EmployeeServiceTests
                 FirstName = "Terminated",
                 LastName = "User",
                 Email = "terminated@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.Terminated
+                Department = "dept-1"
             },
             new Employee
             {
@@ -1332,8 +1343,7 @@ public class EmployeeServiceTests
                 FirstName = "OnLeave",
                 LastName = "User",
                 Email = "onleave@example.com",
-                DepartmentId = "dept-1",
-                Status = EmploymentStatus.OnLeave
+                Department = "dept-1"
             }
         };
 
