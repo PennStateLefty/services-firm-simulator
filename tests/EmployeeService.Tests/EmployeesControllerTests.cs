@@ -46,12 +46,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department
@@ -67,10 +67,10 @@ public class EmployeesControllerTests
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
-            DepartmentId = request.DepartmentId,
-            Title = request.Title,
+            Department = request.DepartmentId,
+            JobTitle = request.Title,
             Level = request.Level,
-            Salary = request.Salary,
+            CurrentSalary = request.Salary,
             HireDate = request.HireDate,
             Status = request.Status
         };
@@ -93,7 +93,7 @@ public class EmployeesControllerTests
         
         var returnedEmployee = Assert.IsType<Employee>(createdResult.Value);
         Assert.Equal(createdEmployee.Id, returnedEmployee.Id);
-        Assert.Equal(createdEmployee.Email, returnedEmployee.Email);
+        Assert.Equal(createdEmployee.Email, returnedEmployee.PersonalInfo.Email);
     }
 
     [Fact]
@@ -105,12 +105,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = "non-existent-dept",
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = "non-existent-dept",
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         _mockDepartmentService.Setup(x => x.GetByIdAsync(request.DepartmentId, It.IsAny<CancellationToken>()))
@@ -139,12 +139,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "existing@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -177,12 +177,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "invalid-email",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -214,12 +214,12 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            // Level property removed,
+            CurrentSalary = 100000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -254,11 +254,10 @@ public class EmployeesControllerTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            DepartmentId = departmentId,
-            Title = "Software Engineer",
-            Salary = 100000m,
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            CurrentSalary = 100000m,
             HireDate = new DateTime(2026, 1, 1),
-            Status = EmploymentStatus.Active,
             CreatedAt = new DateTime(2026, 1, 1),
             UpdatedAt = new DateTime(2026, 1, 1)
         };
@@ -362,12 +361,12 @@ public class EmployeesControllerTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "jane.smith@example.com",
-            DepartmentId = departmentId,
-            Title = "Senior Engineer",
-            Level = 6,
-            Salary = 120000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Pending
+            SalaryType = SalaryType.Annual,
+            Department = departmentId,
+            JobTitle = "Senior Engineer",
+            // Level property removed,
+            CurrentSalary = 120000.00m,
+            HireDate = DateTime.UtcNow
         };
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
@@ -379,7 +378,7 @@ public class EmployeesControllerTests
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
-            DepartmentId = request.DepartmentId,
+            Department = request.DepartmentId,
             Status = request.Status
         };
 

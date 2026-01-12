@@ -16,16 +16,12 @@ public class EmployeeModelTests
         Assert.NotNull(employee.Id);
         Assert.NotEmpty(employee.Id);
         Assert.Empty(employee.EmployeeNumber);
-        Assert.Empty(employee.FirstName);
-        Assert.Empty(employee.LastName);
-        Assert.Empty(employee.Email);
-        Assert.Empty(employee.DepartmentId);
-        Assert.Empty(employee.Title);
-        Assert.Equal(0, employee.Level);
-        Assert.Equal(0, employee.Salary);
-        Assert.Null(employee.TerminationDate);
-        Assert.InRange(employee.CreatedAt, DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddMinutes(1));
-        Assert.InRange(employee.UpdatedAt, DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddMinutes(1));
+        Assert.NotNull(employee.PersonalInfo);
+        Assert.NotNull(employee.EmploymentInfo);
+        Assert.NotNull(employee.Compensation);
+        Assert.NotNull(employee.Metadata);
+        Assert.InRange(employee.Metadata.CreatedAt, DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddMinutes(1));
+        Assert.InRange(employee.Metadata.UpdatedAt, DateTime.UtcNow.AddMinutes(-1), DateTime.UtcNow.AddMinutes(1));
     }
 
     [Fact]
@@ -48,34 +44,66 @@ public class EmployeeModelTests
         // Act
         employee.Id = "test-id-123";
         employee.EmployeeNumber = "EMP-1001";
-        employee.FirstName = "John";
-        employee.LastName = "Doe";
-        employee.Email = "john.doe@example.com";
-        employee.DepartmentId = "dept-123";
-        employee.Title = "Software Engineer";
-        employee.Level = 5;
-        employee.Salary = 100000.00m;
-        employee.HireDate = testDate;
-        employee.TerminationDate = testDate.AddDays(365);
-        employee.Status = EmploymentStatus.Active;
-        employee.CreatedAt = testDate;
-        employee.UpdatedAt = testDate.AddDays(1);
+        employee.PersonalInfo = new PersonalInfo
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john.doe@example.com",
+            PhoneNumber = "555-1234",
+            Address = new Address
+            {
+                Street = "123 Main St",
+                City = "Springfield",
+                State = "IL",
+                ZipCode = "62701"
+            }
+        };
+        employee.EmploymentInfo = new EmploymentInfo
+        {
+            HireDate = testDate,
+            JobTitle = "Software Engineer",
+            Department = "Engineering",
+            ManagerId = "mgr-123",
+            EmploymentType = EmploymentType.FullTime,
+            Status = EmploymentStatus.Active,
+            TerminationDate = testDate.AddDays(365)
+        };
+        employee.Compensation = new Compensation
+        {
+            SalaryType = SalaryType.Annual,
+            CurrentSalary = 100000.00m,
+            Currency = "USD",
+            BonusTarget = 10000.00m
+        };
+        employee.Metadata = new Metadata
+        {
+            CreatedAt = testDate,
+            UpdatedAt = testDate.AddDays(1),
+            CreatedBy = "admin",
+            LastModifiedBy = "manager"
+        };
 
         // Assert
         Assert.Equal("test-id-123", employee.Id);
         Assert.Equal("EMP-1001", employee.EmployeeNumber);
-        Assert.Equal("John", employee.FirstName);
-        Assert.Equal("Doe", employee.LastName);
-        Assert.Equal("john.doe@example.com", employee.Email);
-        Assert.Equal("dept-123", employee.DepartmentId);
-        Assert.Equal("Software Engineer", employee.Title);
-        Assert.Equal(5, employee.Level);
-        Assert.Equal(100000.00m, employee.Salary);
-        Assert.Equal(testDate, employee.HireDate);
-        Assert.Equal(testDate.AddDays(365), employee.TerminationDate);
-        Assert.Equal(EmploymentStatus.Active, employee.Status);
-        Assert.Equal(testDate, employee.CreatedAt);
-        Assert.Equal(testDate.AddDays(1), employee.UpdatedAt);
+        Assert.Equal("John", employee.PersonalInfo.FirstName);
+        Assert.Equal("Doe", employee.PersonalInfo.LastName);
+        Assert.Equal("john.doe@example.com", employee.PersonalInfo.Email);
+        Assert.Equal("555-1234", employee.PersonalInfo.PhoneNumber);
+        Assert.NotNull(employee.PersonalInfo.Address);
+        Assert.Equal("123 Main St", employee.PersonalInfo.Address.Street);
+        Assert.Equal("Engineering", employee.EmploymentInfo.Department);
+        Assert.Equal("Software Engineer", employee.EmploymentInfo.JobTitle);
+        Assert.Equal("mgr-123", employee.EmploymentInfo.ManagerId);
+        Assert.Equal(EmploymentType.FullTime, employee.EmploymentInfo.EmploymentType);
+        Assert.Equal(testDate, employee.EmploymentInfo.HireDate);
+        Assert.Equal(testDate.AddDays(365), employee.EmploymentInfo.TerminationDate);
+        Assert.Equal(EmploymentStatus.Active, employee.EmploymentInfo.Status);
+        Assert.Equal(SalaryType.Annual, employee.Compensation.SalaryType);
+        Assert.Equal(100000.00m, employee.Compensation.CurrentSalary);
+        Assert.Equal(10000.00m, employee.Compensation.BonusTarget);
+        Assert.Equal(testDate, employee.Metadata.CreatedAt);
+        Assert.Equal(testDate.AddDays(1), employee.Metadata.UpdatedAt);
     }
 
     [Fact]
@@ -84,11 +112,14 @@ public class EmployeeModelTests
         // Arrange & Act
         var employee = new Employee
         {
-            TerminationDate = null
+            EmploymentInfo = new EmploymentInfo
+            {
+                TerminationDate = null
+            }
         };
 
         // Assert
-        Assert.Null(employee.TerminationDate);
+        Assert.Null(employee.EmploymentInfo.TerminationDate);
     }
 
     [Fact]
@@ -105,10 +136,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_FirstName_RequiredAttribute_IsPresent()
+    public void PersonalInfo_FirstName_RequiredAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.FirstName));
+        var property = typeof(PersonalInfo).GetProperty(nameof(PersonalInfo.FirstName));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault();
@@ -118,10 +149,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_FirstName_StringLengthAttribute_IsPresent()
+    public void PersonalInfo_FirstName_StringLengthAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.FirstName));
+        var property = typeof(PersonalInfo).GetProperty(nameof(PersonalInfo.FirstName));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(StringLengthAttribute), false)
@@ -133,10 +164,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_LastName_RequiredAttribute_IsPresent()
+    public void PersonalInfo_LastName_RequiredAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.LastName));
+        var property = typeof(PersonalInfo).GetProperty(nameof(PersonalInfo.LastName));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault();
@@ -146,10 +177,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_LastName_StringLengthAttribute_IsPresent()
+    public void PersonalInfo_LastName_StringLengthAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.LastName));
+        var property = typeof(PersonalInfo).GetProperty(nameof(PersonalInfo.LastName));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(StringLengthAttribute), false)
@@ -161,10 +192,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Email_RequiredAttribute_IsPresent()
+    public void PersonalInfo_Email_RequiredAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Email));
+        var property = typeof(PersonalInfo).GetProperty(nameof(PersonalInfo.Email));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault();
@@ -174,10 +205,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Email_EmailAddressAttribute_IsPresent()
+    public void PersonalInfo_Email_EmailAddressAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Email));
+        var property = typeof(PersonalInfo).GetProperty(nameof(PersonalInfo.Email));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(EmailAddressAttribute), false).FirstOrDefault();
@@ -187,23 +218,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_DepartmentId_RequiredAttribute_IsPresent()
+    public void EmploymentInfo_JobTitle_StringLengthAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.DepartmentId));
-
-        // Act
-        var attribute = property?.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault();
-
-        // Assert
-        Assert.NotNull(attribute);
-    }
-
-    [Fact]
-    public void Employee_Title_StringLengthAttribute_IsPresent()
-    {
-        // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Title));
+        var property = typeof(EmploymentInfo).GetProperty(nameof(EmploymentInfo.JobTitle));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(StringLengthAttribute), false)
@@ -215,26 +233,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Level_RangeAttribute_IsPresent()
+    public void Compensation_CurrentSalary_RangeAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Level));
-
-        // Act
-        var attribute = property?.GetCustomAttributes(typeof(RangeAttribute), false)
-            .FirstOrDefault() as RangeAttribute;
-
-        // Assert
-        Assert.NotNull(attribute);
-        Assert.Equal(1, attribute.Minimum);
-        Assert.Equal(10, attribute.Maximum);
-    }
-
-    [Fact]
-    public void Employee_Salary_RangeAttribute_IsPresent()
-    {
-        // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Salary));
+        var property = typeof(Compensation).GetProperty(nameof(Compensation.CurrentSalary));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(RangeAttribute), false)
@@ -247,10 +249,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_HireDate_RequiredAttribute_IsPresent()
+    public void EmploymentInfo_HireDate_RequiredAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.HireDate));
+        var property = typeof(EmploymentInfo).GetProperty(nameof(EmploymentInfo.HireDate));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault();
@@ -260,10 +262,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Status_RequiredAttribute_IsPresent()
+    public void EmploymentInfo_Status_RequiredAttribute_IsPresent()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Status));
+        var property = typeof(EmploymentInfo).GetProperty(nameof(EmploymentInfo.Status));
 
         // Act
         var attribute = property?.GetCustomAttributes(typeof(RequiredAttribute), false).FirstOrDefault();
@@ -273,10 +275,10 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Status_UsesSharedEmploymentStatusEnum()
+    public void EmploymentInfo_Status_UsesSharedEmploymentStatusEnum()
     {
         // Arrange
-        var property = typeof(Employee).GetProperty(nameof(Employee.Status));
+        var property = typeof(EmploymentInfo).GetProperty(nameof(EmploymentInfo.Status));
 
         // Act & Assert
         Assert.NotNull(property);
@@ -284,22 +286,22 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Status_CanBeSetToAllEnumValues()
+    public void EmploymentInfo_Status_CanBeSetToAllEnumValues()
     {
         // Arrange & Act & Assert
-        var employee = new Employee();
+        var employmentInfo = new EmploymentInfo();
 
-        employee.Status = EmploymentStatus.Pending;
-        Assert.Equal(EmploymentStatus.Pending, employee.Status);
+        employmentInfo.Status = EmploymentStatus.Pending;
+        Assert.Equal(EmploymentStatus.Pending, employmentInfo.Status);
 
-        employee.Status = EmploymentStatus.Active;
-        Assert.Equal(EmploymentStatus.Active, employee.Status);
+        employmentInfo.Status = EmploymentStatus.Active;
+        Assert.Equal(EmploymentStatus.Active, employmentInfo.Status);
 
-        employee.Status = EmploymentStatus.OnLeave;
-        Assert.Equal(EmploymentStatus.OnLeave, employee.Status);
+        employmentInfo.Status = EmploymentStatus.OnLeave;
+        Assert.Equal(EmploymentStatus.OnLeave, employmentInfo.Status);
 
-        employee.Status = EmploymentStatus.Terminated;
-        Assert.Equal(EmploymentStatus.Terminated, employee.Status);
+        employmentInfo.Status = EmploymentStatus.Terminated;
+        Assert.Equal(EmploymentStatus.Terminated, employmentInfo.Status);
     }
 
     [Fact]
@@ -309,15 +311,26 @@ public class EmployeeModelTests
         var employee = new Employee
         {
             EmployeeNumber = "EMP-1001",
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Title = "Software Engineer",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Active
+            PersonalInfo = new PersonalInfo
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john.doe@example.com"
+            },
+            EmploymentInfo = new EmploymentInfo
+            {
+                HireDate = DateTime.UtcNow,
+                JobTitle = "Software Engineer",
+                Department = "Engineering",
+                EmploymentType = EmploymentType.FullTime,
+                Status = EmploymentStatus.Active
+            },
+            Compensation = new Compensation
+            {
+                SalaryType = SalaryType.Annual,
+                CurrentSalary = 100000.00m,
+                Currency = "USD"
+            }
         };
 
         var validationContext = new ValidationContext(employee);
@@ -340,14 +353,26 @@ public class EmployeeModelTests
         var employee = new Employee
         {
             EmployeeNumber = employeeNumber!,
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Active
+            PersonalInfo = new PersonalInfo
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john.doe@example.com"
+            },
+            EmploymentInfo = new EmploymentInfo
+            {
+                HireDate = DateTime.UtcNow,
+                JobTitle = "Software Engineer",
+                Department = "Engineering",
+                EmploymentType = EmploymentType.FullTime,
+                Status = EmploymentStatus.Active
+            },
+            Compensation = new Compensation
+            {
+                SalaryType = SalaryType.Annual,
+                CurrentSalary = 100000.00m,
+                Currency = "USD"
+            }
         };
 
         var validationContext = new ValidationContext(employee);
@@ -362,89 +387,76 @@ public class EmployeeModelTests
     }
 
     [Fact]
-    public void Employee_Validation_InvalidEmail_FailsValidation()
+    public void PersonalInfo_Validation_InvalidEmail_FailsValidation()
     {
         // Arrange
-        var employee = new Employee
+        var personalInfo = new PersonalInfo
         {
-            EmployeeNumber = "EMP-1001",
             FirstName = "John",
             LastName = "Doe",
-            Email = "invalid-email",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Active
+            Email = "invalid-email"
         };
 
-        var validationContext = new ValidationContext(employee);
+        var validationContext = new ValidationContext(personalInfo);
         var validationResults = new List<ValidationResult>();
 
         // Act
-        var isValid = Validator.TryValidateObject(employee, validationContext, validationResults, true);
+        var isValid = Validator.TryValidateObject(personalInfo, validationContext, validationResults, true);
 
         // Assert
         Assert.False(isValid);
-        Assert.Contains(validationResults, vr => vr.MemberNames.Contains(nameof(Employee.Email)));
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(11)]
-    [InlineData(-1)]
-    public void Employee_Validation_InvalidLevel_FailsValidation(int level)
-    {
-        // Arrange
-        var employee = new Employee
-        {
-            EmployeeNumber = "EMP-1001",
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = level,
-            Salary = 100000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Active
-        };
-
-        var validationContext = new ValidationContext(employee);
-        var validationResults = new List<ValidationResult>();
-
-        // Act
-        var isValid = Validator.TryValidateObject(employee, validationContext, validationResults, true);
-
-        // Assert
-        Assert.False(isValid);
-        Assert.Contains(validationResults, vr => vr.MemberNames.Contains(nameof(Employee.Level)));
+        Assert.Contains(validationResults, vr => vr.MemberNames.Contains(nameof(PersonalInfo.Email)));
     }
 
     [Fact]
-    public void Employee_Validation_NegativeSalary_FailsValidation()
+    public void Compensation_Validation_NegativeSalary_FailsValidation()
     {
         // Arrange
-        var employee = new Employee
+        var compensation = new Compensation
         {
-            EmployeeNumber = "EMP-1001",
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            DepartmentId = "dept-123",
-            Level = 5,
-            Salary = -1000.00m,
-            HireDate = DateTime.UtcNow,
-            Status = EmploymentStatus.Active
+            SalaryType = SalaryType.Annual,
+            CurrentSalary = -1000.00m,
+            Currency = "USD"
         };
 
-        var validationContext = new ValidationContext(employee);
+        var validationContext = new ValidationContext(compensation);
         var validationResults = new List<ValidationResult>();
 
         // Act
-        var isValid = Validator.TryValidateObject(employee, validationContext, validationResults, true);
+        var isValid = Validator.TryValidateObject(compensation, validationContext, validationResults, true);
 
         // Assert
         Assert.False(isValid);
-        Assert.Contains(validationResults, vr => vr.MemberNames.Contains(nameof(Employee.Salary)));
+        Assert.Contains(validationResults, vr => vr.MemberNames.Contains(nameof(Compensation.CurrentSalary)));
+    }
+
+    [Fact]
+    public void Employee_NestedStructures_AreInitialized()
+    {
+        // Arrange & Act
+        var employee = new Employee();
+
+        // Assert
+        Assert.NotNull(employee.PersonalInfo);
+        Assert.NotNull(employee.EmploymentInfo);
+        Assert.NotNull(employee.Compensation);
+        Assert.NotNull(employee.Metadata);
+    }
+
+    [Fact]
+    public void Employee_ManagerId_CanReferenceAnotherEmployee()
+    {
+        // Arrange & Act
+        var manager = new Employee { Id = "mgr-001" };
+        var employee = new Employee
+        {
+            EmploymentInfo = new EmploymentInfo
+            {
+                ManagerId = manager.Id
+            }
+        };
+
+        // Assert
+        Assert.Equal("mgr-001", employee.EmploymentInfo.ManagerId);
     }
 }
