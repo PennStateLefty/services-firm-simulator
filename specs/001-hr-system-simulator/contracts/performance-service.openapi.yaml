@@ -1,0 +1,563 @@
+openapi: 3.0.3
+info:
+  title: Performance Service API
+  description: Manages performance review cycles, reviews, and performance ratings for the HR System Simulator
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5003/v1
+    description: Local development
+  - url: https://performance-service.azurecontainerapps.io/v1
+    description: Production
+
+tags:
+  - name: Review Cycles
+    description: Performance review cycle management
+  - name: Reviews
+    description: Individual performance reviews
+  - name: Reports
+    description: Performance reporting and analytics
+
+paths:
+  /performance/cycles:
+    post:
+      tags:
+        - Review Cycles
+      summary: Create a new review cycle
+      operationId: createReviewCycle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewCycleRequest'
+      responses:
+        '201':
+          description: Review cycle created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCycle'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Review Cycles
+      summary: List all review cycles
+      operationId: listReviewCycles
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Draft, Active, Closed]
+      responses:
+        '200':
+          description: List of review cycles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReviewCycle'
+
+  /performance/cycles/{cycleId}:
+    get:
+      tags:
+        - Review Cycles
+      summary: Get review cycle by ID
+      operationId: getReviewCycle
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Review cycle details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCycle'
+        '404':
+          description: Cycle not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Review Cycles
+      summary: Update review cycle
+      operationId: updateReviewCycle
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReviewCycleRequest'
+      responses:
+        '200':
+          description: Cycle updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCycle'
+
+  /performance/cycles/{cycleId}/assign:
+    post:
+      tags:
+        - Review Cycles
+      summary: Assign reviews to employees in cycle
+      operationId: assignReviews
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignReviewsRequest'
+      responses:
+        '200':
+          description: Reviews assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCycle'
+
+  /performance/reviews:
+    post:
+      tags:
+        - Reviews
+      summary: Create/submit a performance review
+      operationId: createReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReview'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /performance/reviews/{reviewId}:
+    get:
+      tags:
+        - Reviews
+      summary: Get review by ID
+      operationId: getReview
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Review details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReview'
+        '404':
+          description: Review not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Reviews
+      summary: Update review (draft only)
+      operationId: updateReview
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReviewRequest'
+      responses:
+        '200':
+          description: Review updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReview'
+
+  /performance/reviews/{reviewId}/submit:
+    post:
+      tags:
+        - Reviews
+      summary: Submit a draft review (makes it immutable)
+      operationId: submitReview
+      parameters:
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Review submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReview'
+
+  /performance/employees/{employeeId}/reviews:
+    get:
+      tags:
+        - Reviews
+      summary: Get all reviews for an employee
+      operationId: getEmployeeReviews
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Employee review history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PerformanceReview'
+
+  /performance/cycles/{cycleId}/report:
+    get:
+      tags:
+        - Reports
+      summary: Get performance report for a cycle
+      operationId: getCycleReport
+      parameters:
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Performance report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceReport'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+
+components:
+  schemas:
+    CreateReviewCycleRequest:
+      type: object
+      required:
+        - name
+        - reviewPeriodStart
+        - reviewPeriodEnd
+        - cycleStartDate
+        - cycleEndDate
+      properties:
+        name:
+          type: string
+        reviewPeriodStart:
+          type: string
+          format: date
+        reviewPeriodEnd:
+          type: string
+          format: date
+        cycleStartDate:
+          type: string
+          format: date
+        cycleEndDate:
+          type: string
+          format: date
+
+    UpdateReviewCycleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        cycleEndDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Draft, Active, Closed]
+
+    AssignReviewsRequest:
+      type: object
+      required:
+        - assignments
+      properties:
+        assignments:
+          type: array
+          items:
+            type: object
+            required:
+              - employeeId
+              - reviewerId
+              - reviewType
+            properties:
+              employeeId:
+                type: string
+              reviewerId:
+                type: string
+              reviewType:
+                type: string
+                enum: [Manager, Peer, Self]
+
+    CreateReviewRequest:
+      type: object
+      required:
+        - employeeId
+        - reviewCycleId
+        - reviewerId
+        - reviewType
+        - competencyRatings
+      properties:
+        employeeId:
+          type: string
+        reviewCycleId:
+          type: string
+        reviewerId:
+          type: string
+        reviewType:
+          type: string
+          enum: [Manager, Peer, Self]
+        competencyRatings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetencyRating'
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        writtenFeedback:
+          $ref: '#/components/schemas/WrittenFeedback'
+        status:
+          type: string
+          enum: [Draft, Submitted]
+          default: Draft
+
+    UpdateReviewRequest:
+      type: object
+      properties:
+        competencyRatings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetencyRating'
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        writtenFeedback:
+          $ref: '#/components/schemas/WrittenFeedback'
+
+    ReviewCycle:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        reviewPeriodStart:
+          type: string
+          format: date
+        reviewPeriodEnd:
+          type: string
+          format: date
+        cycleStartDate:
+          type: string
+          format: date
+        cycleEndDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [Draft, Active, Closed]
+        assignedReviews:
+          type: array
+          items:
+            type: object
+            properties:
+              employeeId:
+                type: string
+              reviewerId:
+                type: string
+              reviewType:
+                type: string
+              assigned:
+                type: boolean
+              completed:
+                type: boolean
+        statistics:
+          type: object
+          properties:
+            totalAssigned:
+              type: integer
+            totalCompleted:
+              type: integer
+            completionPercentage:
+              type: number
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    PerformanceReview:
+      type: object
+      properties:
+        id:
+          type: string
+        employeeId:
+          type: string
+        reviewCycleId:
+          type: string
+        reviewerId:
+          type: string
+        reviewType:
+          type: string
+          enum: [Manager, Peer, Self]
+        reviewPeriodStart:
+          type: string
+          format: date
+        reviewPeriodEnd:
+          type: string
+          format: date
+        competencyRatings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompetencyRating'
+        overallRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        writtenFeedback:
+          $ref: '#/components/schemas/WrittenFeedback'
+        status:
+          type: string
+          enum: [Draft, Submitted]
+        metadata:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+            submittedAt:
+              type: string
+              format: date-time
+
+    CompetencyRating:
+      type: object
+      required:
+        - competency
+        - rating
+      properties:
+        competency:
+          type: string
+          enum: [JobKnowledge, QualityOfWork, Communication, Teamwork, Leadership]
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comments:
+          type: string
+
+    WrittenFeedback:
+      type: object
+      properties:
+        strengths:
+          type: string
+        areasForImprovement:
+          type: string
+        developmentRecommendations:
+          type: string
+
+    PerformanceReport:
+      type: object
+      properties:
+        cycleId:
+          type: string
+        cycleName:
+          type: string
+        completionRate:
+          type: number
+        ratingDistribution:
+          type: object
+          additionalProperties:
+            type: integer
+        departmentSummaries:
+          type: array
+          items:
+            type: object
+            properties:
+              department:
+                type: string
+              averageRating:
+                type: number
+              completionRate:
+                type: number
+              totalReviews:
+                type: integer
+
+    Metadata:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
