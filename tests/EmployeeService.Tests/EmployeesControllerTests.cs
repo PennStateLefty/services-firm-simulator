@@ -359,4 +359,267 @@ public class EmployeesControllerTests
         Assert.Equal("emp-789", createdResult.RouteValues["employeeId"]);
         Assert.Equal(nameof(EmployeesController.GetEmployee), createdResult.ActionName);
     }
+
+    [Fact]
+    public async Task GetEmployees_DefaultParameters_Returns200Ok()
+    {
+        // Arrange
+        var response = new EmployeeListResponse
+        {
+            Employees = new List<EmployeeSummary>
+            {
+                new EmployeeSummary
+                {
+                    Id = "emp-1",
+                    EmployeeNumber = "EMP2026000001",
+                    FullName = "John Doe",
+                    Email = "john.doe@example.com",
+                    JobTitle = "Software Engineer",
+                    Department = "Engineering",
+                    Status = "Active"
+                }
+            },
+            Pagination = new PaginationMetadata
+            {
+                Page = 1,
+                PageSize = 50,
+                TotalCount = 1,
+                TotalPages = 1
+            }
+        };
+
+        _mockEmployeeService.Setup(x => x.GetEmployeesAsync(1, 50, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.GetEmployees(1, 50, null, null, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(200, okResult.StatusCode);
+        
+        var returnedResponse = Assert.IsType<EmployeeListResponse>(okResult.Value);
+        Assert.Single(returnedResponse.Employees);
+        Assert.Equal(1, returnedResponse.Pagination.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetEmployees_WithPagination_ReturnsCorrectPage()
+    {
+        // Arrange
+        var response = new EmployeeListResponse
+        {
+            Employees = new List<EmployeeSummary>
+            {
+                new EmployeeSummary
+                {
+                    Id = "emp-21",
+                    EmployeeNumber = "EMP2026000021",
+                    FullName = "Jane Smith",
+                    Email = "jane.smith@example.com",
+                    JobTitle = "Senior Engineer",
+                    Department = "Engineering",
+                    Status = "Active"
+                }
+            },
+            Pagination = new PaginationMetadata
+            {
+                Page = 2,
+                PageSize = 20,
+                TotalCount = 25,
+                TotalPages = 2
+            }
+        };
+
+        _mockEmployeeService.Setup(x => x.GetEmployeesAsync(2, 20, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.GetEmployees(2, 20, null, null, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var returnedResponse = Assert.IsType<EmployeeListResponse>(okResult.Value);
+        Assert.Equal(2, returnedResponse.Pagination.Page);
+        Assert.Equal(20, returnedResponse.Pagination.PageSize);
+        Assert.Equal(25, returnedResponse.Pagination.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetEmployees_WithStatusFilter_CallsServiceWithMappedStatus()
+    {
+        // Arrange
+        var response = new EmployeeListResponse
+        {
+            Employees = new List<EmployeeSummary>(),
+            Pagination = new PaginationMetadata
+            {
+                Page = 1,
+                PageSize = 50,
+                TotalCount = 0,
+                TotalPages = 0
+            }
+        };
+
+        _mockEmployeeService.Setup(x => x.GetEmployeesAsync(1, 50, "Pending", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.GetEmployees(1, 50, "Onboarding", null, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        _mockEmployeeService.Verify(
+            x => x.GetEmployeesAsync(1, 50, "Pending", null, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetEmployees_WithDepartmentFilter_ResolvesAndFilters()
+    {
+        // Arrange
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-123", Name = "Engineering" },
+            new Department { Id = "dept-456", Name = "Sales" }
+        };
+
+        var response = new EmployeeListResponse
+        {
+            Employees = new List<EmployeeSummary>
+            {
+                new EmployeeSummary
+                {
+                    Id = "emp-1",
+                    EmployeeNumber = "EMP2026000001",
+                    FullName = "John Doe",
+                    Email = "john.doe@example.com",
+                    JobTitle = "Software Engineer",
+                    Department = "Engineering",
+                    Status = "Active"
+                }
+            },
+            Pagination = new PaginationMetadata
+            {
+                Page = 1,
+                PageSize = 50,
+                TotalCount = 1,
+                TotalPages = 1
+            }
+        };
+
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        _mockEmployeeService.Setup(x => x.GetEmployeesAsync(1, 50, null, "dept-123", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await _controller.GetEmployees(1, 50, null, "Engineering", CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        _mockEmployeeService.Verify(
+            x => x.GetEmployeesAsync(1, 50, null, "dept-123", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetEmployees_WithNonExistentDepartment_ReturnsEmptyList()
+    {
+        // Arrange
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-123", Name = "Engineering" }
+        };
+
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act
+        var result = await _controller.GetEmployees(1, 50, null, "NonExistent", CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var returnedResponse = Assert.IsType<EmployeeListResponse>(okResult.Value);
+        Assert.Empty(returnedResponse.Employees);
+        Assert.Equal(0, returnedResponse.Pagination.TotalCount);
+        
+        // Service should not be called when department doesn't exist
+        _mockEmployeeService.Verify(
+            x => x.GetEmployeesAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task GetEmployees_InvalidPage_Returns400BadRequest(int page)
+    {
+        // Act
+        var result = await _controller.GetEmployees(page, 50, null, null, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(badRequestResult.Value);
+        Assert.Contains("Page", errorResponse.Detail ?? string.Empty);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public async Task GetEmployees_InvalidPageSize_Returns400BadRequest(int pageSize)
+    {
+        // Act
+        var result = await _controller.GetEmployees(1, pageSize, null, null, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(badRequestResult.Value);
+        Assert.Contains("PageSize", errorResponse.Detail ?? string.Empty);
+    }
+
+    [Theory]
+    [InlineData("InvalidStatus")]
+    [InlineData("Pending")]
+    public async Task GetEmployees_InvalidStatus_Returns400BadRequest(string status)
+    {
+        // Act
+        var result = await _controller.GetEmployees(1, 50, status, null, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Equal(400, badRequestResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(badRequestResult.Value);
+        Assert.Contains("Status", errorResponse.Detail ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task GetEmployees_ExceptionThrown_Returns500InternalServerError()
+    {
+        // Arrange
+        _mockEmployeeService.Setup(x => x.GetEmployeesAsync(
+            It.IsAny<int>(), 
+            It.IsAny<int>(), 
+            It.IsAny<string>(), 
+            It.IsAny<string>(), 
+            It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Database error"));
+
+        // Act
+        var result = await _controller.GetEmployees(1, 50, null, null, CancellationToken.None);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+        
+        var errorResponse = Assert.IsType<ErrorResponse>(statusCodeResult.Value);
+        Assert.Equal(500, errorResponse.StatusCode);
+    }
 }
