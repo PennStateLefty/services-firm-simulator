@@ -726,7 +726,8 @@ public class EmployeeServiceTests
         var currentYear = DateTime.UtcNow.Year;
         var expectedEmployeeNumber = $"EMP{currentYear}000042";
         Assert.Equal(expectedEmployeeNumber, result.EmployeeNumber);
-        Assert.Equal(13, result.EmployeeNumber.Length); // EMP(3) + year(4) + sequential(6) = 13
+        const int ExpectedEmployeeNumberLength = 13; // EMP(3) + year(4) + sequential(6) = 13
+        Assert.Equal(ExpectedEmployeeNumberLength, result.EmployeeNumber.Length);
     }
 
     [Fact]
@@ -804,6 +805,9 @@ public class EmployeeServiceTests
 
         // Assert
         Assert.NotEqual(result1.EmployeeNumber, result2.EmployeeNumber);
-        Assert.True(int.Parse(result1.EmployeeNumber.Substring(7)) < int.Parse(result2.EmployeeNumber.Substring(7)));
+        // Compare the last 6 characters (the sequential part)
+        var sequential1 = int.Parse(result1.EmployeeNumber[^6..]);
+        var sequential2 = int.Parse(result2.EmployeeNumber[^6..]);
+        Assert.True(sequential1 < sequential2, "Sequential numbers should be in ascending order");
     }
 }
