@@ -1,5 +1,6 @@
 using EmployeeService.Infrastructure;
 using EmployeeService.Models;
+using EmployeeService.Exceptions;
 using Shared.Models;
 using System.ComponentModel.DataAnnotations;
 
@@ -20,6 +21,7 @@ public class EmployeeServiceImpl : IEmployeeService
     private readonly IDaprStateStore _stateStore;
     private readonly ILogger<EmployeeServiceImpl> _logger;
     private const string EmployeePrefix = "employee:";
+    private const string EmailIndexPrefix = "email-index:";
 
     public EmployeeServiceImpl(IDaprStateStore stateStore, ILogger<EmployeeServiceImpl> logger)
     {
@@ -66,6 +68,15 @@ public class EmployeeServiceImpl : IEmployeeService
             throw new ValidationException($"Validation failed: {errors}");
         }
         
+        // Check if email already exists
+        var emailIndexKey = $"{EmailIndexPrefix}{request.Email.ToLowerInvariant()}";
+        var existingEmployeeId = await _stateStore.GetStateAsync<string>(emailIndexKey, cancellationToken);
+        if (existingEmployeeId != null)
+        {
+            _logger.LogWarning("Email already exists: {Email}", request.Email);
+            throw new EmailAlreadyExistsException(request.Email);
+        }
+        
         var employee = new Employee
         {
             Id = Guid.NewGuid().ToString(),
@@ -83,7 +94,9 @@ public class EmployeeServiceImpl : IEmployeeService
             UpdatedAt = DateTime.UtcNow
         };
 
+        // Save employee and email index atomically
         await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
+        await _stateStore.SaveStateAsync(emailIndexKey, employee.Id, cancellationToken);
         
         _logger.LogInformation("Employee created: {Id}", employee.Id);
         return employee;
@@ -110,6 +123,9 @@ public class EmployeeServiceImpl : IEmployeeService
             throw new KeyNotFoundException($"Employee with ID {id} not found");
         }
 
+        // Track old email for index cleanup
+        string? oldEmail = null;
+
         // Update only the provided fields
         if (!string.IsNullOrWhiteSpace(request.FirstName))
         {
@@ -123,6 +139,20 @@ public class EmployeeServiceImpl : IEmployeeService
 
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
+            // Check if email is changing
+            if (!string.Equals(employee.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                // Check if new email already exists
+                var newEmailIndexKey = $"{EmailIndexPrefix}{request.Email.ToLowerInvariant()}";
+                var existingEmployeeId = await _stateStore.GetStateAsync<string>(newEmailIndexKey, cancellationToken);
+                if (existingEmployeeId != null && existingEmployeeId != employee.Id)
+                {
+                    _logger.LogWarning("Email already exists: {Email}", request.Email);
+                    throw new EmailAlreadyExistsException(request.Email);
+                }
+                
+                oldEmail = employee.Email;
+            }
             employee.Email = request.Email;
         }
 
@@ -158,7 +188,22 @@ public class EmployeeServiceImpl : IEmployeeService
 
         employee.UpdatedAt = DateTime.UtcNow;
 
+        // Save employee
         await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
+        
+        // Update email index if email changed
+        if (oldEmail != null)
+        {
+            // Delete old email index
+            var oldEmailIndexKey = $"{EmailIndexPrefix}{oldEmail.ToLowerInvariant()}";
+            await _stateStore.DeleteStateAsync(oldEmailIndexKey, cancellationToken);
+            
+            // Create new email index
+            var newEmailIndexKey = $"{EmailIndexPrefix}{employee.Email.ToLowerInvariant()}";
+            await _stateStore.SaveStateAsync(newEmailIndexKey, employee.Id, cancellationToken);
+            
+            _logger.LogInformation("Email index updated for employee {Id}: {OldEmail} -> {NewEmail}", employee.Id, oldEmail, employee.Email);
+        }
         
         _logger.LogInformation("Employee updated: {Id}", employee.Id);
         return employee;
@@ -181,6 +226,11 @@ public class EmployeeServiceImpl : IEmployeeService
         employee.UpdatedAt = DateTime.UtcNow;
 
         await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
+        
+        // Note: Email index is NOT deleted on soft delete to prevent email reuse
+        // For hard delete implementation, add:
+        // var emailIndexKey = $"{EmailIndexPrefix}{employee.Email.ToLowerInvariant()}";
+        // await _stateStore.DeleteStateAsync(emailIndexKey, cancellationToken);
         
         _logger.LogInformation("Employee soft deleted: {Id}", employee.Id);
     }
