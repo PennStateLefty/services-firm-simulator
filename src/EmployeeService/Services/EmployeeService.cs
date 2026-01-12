@@ -14,20 +14,31 @@ public interface IEmployeeService
     Task<Employee> UpdateAsync(string id, UpdateEmployeeRequest request, CancellationToken cancellationToken = default);
     Task DeleteAsync(string id, CancellationToken cancellationToken = default);
     Task<IEnumerable<Employee>> QueryAsync(string filter, CancellationToken cancellationToken = default);
+    Task<EmployeeListResponse> GetEmployeesAsync(
+        int page, 
+        int pageSize, 
+        string? status, 
+        string? departmentId, 
+        CancellationToken cancellationToken = default);
 }
 
 public class EmployeeServiceImpl : IEmployeeService
 {
     private readonly IDaprStateStore _stateStore;
+    private readonly IDepartmentService _departmentService;
     private readonly ILogger<EmployeeServiceImpl> _logger;
     private const string EmployeePrefix = "employee:";
     private const string EmailIndexPrefix = "email-index:";
     private const string EmployeeCounterPrefix = "employee-counter:";
     private const string CompensationHistoryPrefix = "compensation-history:";
 
-    public EmployeeServiceImpl(IDaprStateStore stateStore, ILogger<EmployeeServiceImpl> logger)
+    public EmployeeServiceImpl(
+        IDaprStateStore stateStore, 
+        IDepartmentService departmentService,
+        ILogger<EmployeeServiceImpl> logger)
     {
         _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
+        _departmentService = departmentService ?? throw new ArgumentNullException(nameof(departmentService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -270,6 +281,97 @@ public class EmployeeServiceImpl : IEmployeeService
         
         _logger.LogInformation("Query returned {Count} employees", employees.Count());
         return employees;
+    }
+
+    public async Task<EmployeeListResponse> GetEmployeesAsync(
+        int page, 
+        int pageSize, 
+        string? status, 
+        string? departmentId, 
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Getting employees - Page: {Page}, PageSize: {PageSize}, Status: {Status}, DepartmentId: {DepartmentId}", 
+            page, pageSize, status, departmentId);
+
+        // Get all employees
+        var allEmployees = await GetAllAsync(cancellationToken);
+        
+        // Apply filters
+        var filteredEmployees = allEmployees.AsEnumerable();
+        
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (Enum.TryParse<EmploymentStatus>(status, true, out var statusEnum))
+            {
+                filteredEmployees = filteredEmployees.Where(e => e.Status == statusEnum);
+            }
+        }
+        
+        if (!string.IsNullOrWhiteSpace(departmentId))
+        {
+            filteredEmployees = filteredEmployees.Where(e => 
+                string.Equals(e.DepartmentId, departmentId, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        // Sort by LastName, FirstName ascending
+        var sortedEmployees = filteredEmployees
+            .OrderBy(e => e.LastName)
+            .ThenBy(e => e.FirstName)
+            .ToList();
+        
+        var totalCount = sortedEmployees.Count;
+        var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+        
+        // Apply pagination
+        var pagedEmployees = sortedEmployees
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+        
+        // Fetch all departments once for efficiency
+        var departments = await _departmentService.GetAllAsync(cancellationToken);
+        var departmentDict = departments.ToDictionary(d => d.Id, d => d.Name);
+        
+        // Create EmployeeSummary list with actual department names
+        // Map internal status to OpenAPI spec status
+        var employeeSummaries = pagedEmployees.Select(employee => new EmployeeSummary
+        {
+            Id = employee.Id,
+            EmployeeNumber = employee.EmployeeNumber,
+            FullName = $"{employee.FirstName} {employee.LastName}",
+            Email = employee.Email,
+            JobTitle = employee.Title,
+            Department = departmentDict.TryGetValue(employee.DepartmentId, out var deptName) 
+                ? deptName 
+                : employee.DepartmentId,
+            Status = employee.Status switch
+            {
+                EmploymentStatus.Pending => "Onboarding",
+                EmploymentStatus.Active => "Active",
+                EmploymentStatus.Terminated => "Inactive",
+                EmploymentStatus.OnLeave => "Active", // Map OnLeave to Active for API
+                _ => employee.Status.ToString()
+            }
+        }).ToList();
+        
+        var response = new EmployeeListResponse
+        {
+            Employees = employeeSummaries,
+            Pagination = new PaginationMetadata
+            {
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages
+            }
+        };
+        
+        _logger.LogInformation(
+            "Returning {Count} employees out of {TotalCount} total", 
+            employeeSummaries.Count, totalCount);
+        
+        return response;
     }
 
     private async Task<string> GenerateEmployeeNumberAsync(CancellationToken cancellationToken = default)

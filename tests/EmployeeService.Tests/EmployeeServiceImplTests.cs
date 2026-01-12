@@ -12,14 +12,19 @@ namespace EmployeeService.Tests;
 public class EmployeeServiceTests
 {
     private readonly Mock<IDaprStateStore> _mockStateStore;
+    private readonly Mock<IDepartmentService> _mockDepartmentService;
     private readonly Mock<ILogger<EmployeeServiceImpl>> _mockLogger;
     private readonly IEmployeeService _employeeService;
 
     public EmployeeServiceTests()
     {
         _mockStateStore = new Mock<IDaprStateStore>();
+        _mockDepartmentService = new Mock<IDepartmentService>();
         _mockLogger = new Mock<ILogger<EmployeeServiceImpl>>();
-        _employeeService = new EmployeeServiceImpl(_mockStateStore.Object, _mockLogger.Object);
+        _employeeService = new EmployeeServiceImpl(
+            _mockStateStore.Object, 
+            _mockDepartmentService.Object,
+            _mockLogger.Object);
     }
 
     [Fact]
@@ -1014,5 +1019,345 @@ public class EmployeeServiceTests
         _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
             It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetEmployeesAsync_DefaultParameters_ReturnsAllEmployees()
+    {
+        // Arrange
+        var employees = new List<Employee>
+        {
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Alice",
+                LastName = "Anderson",
+                Email = "alice@example.com",
+                DepartmentId = "dept-1",
+                Title = "Engineer",
+                Status = EmploymentStatus.Active
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Bob",
+                LastName = "Brown",
+                Email = "bob@example.com",
+                DepartmentId = "dept-2",
+                Title = "Designer",
+                Status = EmploymentStatus.Active
+            }
+        };
+
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-1", Name = "Engineering" },
+            new Department { Id = "dept-2", Name = "Design" }
+        };
+
+        _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(employees);
+        
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act
+        var result = await _employeeService.GetEmployeesAsync(1, 50, null, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Employees.Count);
+        Assert.Equal(2, result.Pagination.TotalCount);
+        Assert.Equal(1, result.Pagination.Page);
+        Assert.Equal(50, result.Pagination.PageSize);
+        Assert.Equal(1, result.Pagination.TotalPages);
+    }
+
+    [Fact]
+    public async Task GetEmployeesAsync_WithPagination_ReturnsCorrectPage()
+    {
+        // Arrange
+        var employees = Enumerable.Range(1, 25).Select(i => new Employee
+        {
+            Id = $"emp-{i}",
+            EmployeeNumber = $"EMP2026{i:D6}",
+            FirstName = $"First{i}",
+            LastName = $"Last{i}",
+            Email = $"emp{i}@example.com",
+            DepartmentId = "dept-1",
+            Title = "Employee",
+            Status = EmploymentStatus.Active
+        }).ToList();
+
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-1", Name = "Engineering" }
+        };
+
+        _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(employees);
+        
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act - Get page 2 with pageSize 10
+        var result = await _employeeService.GetEmployeesAsync(2, 10, null, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(10, result.Employees.Count);
+        Assert.Equal(25, result.Pagination.TotalCount);
+        Assert.Equal(2, result.Pagination.Page);
+        Assert.Equal(10, result.Pagination.PageSize);
+        Assert.Equal(3, result.Pagination.TotalPages);
+    }
+
+    [Fact]
+    public async Task GetEmployeesAsync_WithStatusFilter_ReturnsFilteredEmployees()
+    {
+        // Arrange
+        var employees = new List<Employee>
+        {
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Active",
+                LastName = "User",
+                Email = "active@example.com",
+                DepartmentId = "dept-1",
+                Title = "Engineer",
+                Status = EmploymentStatus.Active
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Pending",
+                LastName = "User",
+                Email = "pending@example.com",
+                DepartmentId = "dept-1",
+                Title = "Engineer",
+                Status = EmploymentStatus.Pending
+            },
+            new Employee
+            {
+                Id = "emp-3",
+                EmployeeNumber = "EMP2026000003",
+                FirstName = "Terminated",
+                LastName = "User",
+                Email = "terminated@example.com",
+                DepartmentId = "dept-1",
+                Title = "Engineer",
+                Status = EmploymentStatus.Terminated
+            }
+        };
+
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-1", Name = "Engineering" }
+        };
+
+        _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(employees);
+        
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act
+        var result = await _employeeService.GetEmployeesAsync(1, 50, "Pending", null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Employees);
+        Assert.Equal("emp-2", result.Employees[0].Id);
+        Assert.Equal("Onboarding", result.Employees[0].Status);
+        Assert.Equal(1, result.Pagination.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetEmployeesAsync_WithDepartmentFilter_ReturnsFilteredEmployees()
+    {
+        // Arrange
+        var employees = new List<Employee>
+        {
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Alice",
+                LastName = "Anderson",
+                Email = "alice@example.com",
+                DepartmentId = "dept-1",
+                Title = "Engineer",
+                Status = EmploymentStatus.Active
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Bob",
+                LastName = "Brown",
+                Email = "bob@example.com",
+                DepartmentId = "dept-2",
+                Title = "Designer",
+                Status = EmploymentStatus.Active
+            }
+        };
+
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-1", Name = "Engineering" },
+            new Department { Id = "dept-2", Name = "Design" }
+        };
+
+        _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(employees);
+        
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act
+        var result = await _employeeService.GetEmployeesAsync(1, 50, null, "dept-1");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Employees);
+        Assert.Equal("emp-1", result.Employees[0].Id);
+        Assert.Equal("Engineering", result.Employees[0].Department);
+    }
+
+    [Fact]
+    public async Task GetEmployeesAsync_SortsByLastNameThenFirstName()
+    {
+        // Arrange
+        var employees = new List<Employee>
+        {
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Charlie",
+                LastName = "Brown",
+                Email = "charlie@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.Active
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Alice",
+                LastName = "Anderson",
+                Email = "alice@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.Active
+            },
+            new Employee
+            {
+                Id = "emp-3",
+                EmployeeNumber = "EMP2026000003",
+                FirstName = "Bob",
+                LastName = "Anderson",
+                Email = "bob@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.Active
+            }
+        };
+
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-1", Name = "Engineering" }
+        };
+
+        _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(employees);
+        
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act
+        var result = await _employeeService.GetEmployeesAsync(1, 50, null, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(3, result.Employees.Count);
+        Assert.Equal("Alice Anderson", result.Employees[0].FullName);
+        Assert.Equal("Bob Anderson", result.Employees[1].FullName);
+        Assert.Equal("Charlie Brown", result.Employees[2].FullName);
+    }
+
+    [Fact]
+    public async Task GetEmployeesAsync_MapsStatusToOpenAPIValues()
+    {
+        // Arrange
+        var employees = new List<Employee>
+        {
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Pending",
+                LastName = "User",
+                Email = "pending@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.Pending
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Active",
+                LastName = "User",
+                Email = "active@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.Active
+            },
+            new Employee
+            {
+                Id = "emp-3",
+                EmployeeNumber = "EMP2026000003",
+                FirstName = "Terminated",
+                LastName = "User",
+                Email = "terminated@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.Terminated
+            },
+            new Employee
+            {
+                Id = "emp-4",
+                EmployeeNumber = "EMP2026000004",
+                FirstName = "OnLeave",
+                LastName = "User",
+                Email = "onleave@example.com",
+                DepartmentId = "dept-1",
+                Status = EmploymentStatus.OnLeave
+            }
+        };
+
+        var departments = new List<Department>
+        {
+            new Department { Id = "dept-1", Name = "Engineering" }
+        };
+
+        _mockStateStore.Setup(x => x.QueryStateAsync<Employee>("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(employees);
+        
+        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(departments);
+
+        // Act
+        var result = await _employeeService.GetEmployeesAsync(1, 50, null, null);
+
+        // Assert - All have LastName "User", so should be sorted by FirstName
+        Assert.NotNull(result);
+        Assert.Equal(4, result.Employees.Count);
+        // Sorted by LastName then FirstName: Active, OnLeave, Pending, Terminated
+        Assert.Equal("Active", result.Employees[0].Status); // Active User
+        Assert.Equal("Active", result.Employees[1].Status); // OnLeave User (mapped to Active)
+        Assert.Equal("Onboarding", result.Employees[2].Status); // Pending User (mapped to Onboarding)
+        Assert.Equal("Inactive", result.Employees[3].Status); // Terminated User (mapped to Inactive)
     }
 }

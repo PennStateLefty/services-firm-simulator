@@ -89,6 +89,108 @@ public class EmployeesController : ControllerBase
         }
     }
 
+    [HttpGet]
+    public async Task<ActionResult<EmployeeListResponse>> GetEmployees(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? status = null,
+        [FromQuery] string? department = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Getting employees - Page: {Page}, PageSize: {PageSize}, Status: {Status}, Department: {Department}",
+                page, pageSize, status, department);
+
+            // Validate pagination parameters
+            if (page < 1)
+            {
+                return BadRequest(ErrorResponse.Create(
+                    400, 
+                    "Invalid parameter", 
+                    "Page must be greater than or equal to 1", 
+                    HttpContext.TraceIdentifier));
+            }
+
+            if (pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest(ErrorResponse.Create(
+                    400, 
+                    "Invalid parameter", 
+                    "PageSize must be between 1 and 100", 
+                    HttpContext.TraceIdentifier));
+            }
+
+            // Validate and map status if provided
+            // OpenAPI spec uses: Onboarding, Active, Inactive
+            // Internal enum has: Pending, Active, OnLeave, Terminated
+            string? mappedStatus = null;
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                mappedStatus = status switch
+                {
+                    "Onboarding" => "Pending",
+                    "Active" => "Active",
+                    "Inactive" => "Terminated",
+                    _ => null
+                };
+
+                if (mappedStatus == null)
+                {
+                    return BadRequest(ErrorResponse.Create(
+                        400,
+                        "Invalid parameter",
+                        "Status must be one of: Onboarding, Active, Inactive",
+                        HttpContext.TraceIdentifier));
+                }
+            }
+
+            // Convert department name to department ID if provided
+            string? departmentId = null;
+            if (!string.IsNullOrWhiteSpace(department))
+            {
+                var departments = await _departmentService.GetAllAsync(cancellationToken);
+                var matchingDept = departments.FirstOrDefault(d => 
+                    string.Equals(d.Name, department, StringComparison.OrdinalIgnoreCase));
+                
+                if (matchingDept != null)
+                {
+                    departmentId = matchingDept.Id;
+                }
+                else
+                {
+                    // No matching department found, return empty list
+                    return Ok(new EmployeeListResponse
+                    {
+                        Employees = new List<EmployeeSummary>(),
+                        Pagination = new PaginationMetadata
+                        {
+                            Page = page,
+                            PageSize = pageSize,
+                            TotalCount = 0,
+                            TotalPages = 0
+                        }
+                    });
+                }
+            }
+
+            var result = await _employeeService.GetEmployeesAsync(
+                page, 
+                pageSize, 
+                mappedStatus, 
+                departmentId, 
+                cancellationToken);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting employees");
+            return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext.TraceIdentifier));
+        }
+    }
+
     [HttpGet("{employeeId}")]
     public async Task<ActionResult<Employee>> GetEmployee(string employeeId, CancellationToken cancellationToken)
     {
