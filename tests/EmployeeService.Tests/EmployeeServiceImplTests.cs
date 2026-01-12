@@ -90,7 +90,6 @@ public class EmployeeServiceTests
         // Arrange
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "EMP-1001",
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
@@ -102,13 +101,19 @@ public class EmployeeServiceTests
             Status = EmploymentStatus.Pending
         };
 
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
         Assert.NotNull(result);
         Assert.NotEmpty(result.Id);
-        Assert.Equal(request.EmployeeNumber, result.EmployeeNumber);
+        Assert.Matches(@"^EMP\d{4}\d{6}$", result.EmployeeNumber); // Verify format EMP{year}{sequential:000000}
         Assert.Equal(request.FirstName, result.FirstName);
         Assert.Equal(request.LastName, result.LastName);
         Assert.Equal(request.Email, result.Email);
@@ -124,7 +129,6 @@ public class EmployeeServiceTests
         // Arrange
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "", // Invalid: empty
             FirstName = "John",
             LastName = "Doe",
             Email = "invalid-email", // Invalid email format
@@ -281,7 +285,6 @@ public class EmployeeServiceTests
         // Arrange
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "EMP-1001",
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
@@ -291,6 +294,13 @@ public class EmployeeServiceTests
             HireDate = DateTime.UtcNow,
             Status = EmploymentStatus.Pending
         };
+        
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+            
         var beforeCreate = DateTime.UtcNow;
 
         // Act
@@ -343,7 +353,6 @@ public class EmployeeServiceTests
         // Arrange
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "EMP-1001",
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
@@ -353,6 +362,12 @@ public class EmployeeServiceTests
             HireDate = DateTime.UtcNow,
             Status = EmploymentStatus.Pending
         };
+
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         // Act
         var result = await _employeeService.CreateAsync(request);
@@ -376,7 +391,6 @@ public class EmployeeServiceTests
 
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "EMP-1002",
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
@@ -404,7 +418,6 @@ public class EmployeeServiceTests
         // Arrange
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "EMP-1001",
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
@@ -417,6 +430,12 @@ public class EmployeeServiceTests
 
         _mockStateStore.Setup(x => x.GetStateAsync<string>($"email-index:{request.Email.ToLowerInvariant()}", It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
+
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
 
         // Act
         var result = await _employeeService.CreateAsync(request);
@@ -440,7 +459,6 @@ public class EmployeeServiceTests
 
         var request = new CreateEmployeeRequest
         {
-            EmployeeNumber = "EMP-1002",
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
@@ -646,5 +664,146 @@ public class EmployeeServiceTests
         _mockStateStore.Verify(x => x.DeleteStateAsync(
             It.Is<string>(k => k.StartsWith("email-index:")),
             It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AutoGeneratesEmployeeNumber_WithCorrectFormat()
+    {
+        // Arrange
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john.doe@example.com",
+            DepartmentId = "dept-123",
+            Level = 5,
+            Salary = 100000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Mock counter increment to return 1
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        // Act
+        var result = await _employeeService.CreateAsync(request);
+
+        // Assert
+        var currentYear = DateTime.UtcNow.Year;
+        var expectedEmployeeNumber = $"EMP{currentYear}000001";
+        Assert.Equal(expectedEmployeeNumber, result.EmployeeNumber);
+    }
+
+    [Fact]
+    public async Task CreateAsync_AutoGeneratesEmployeeNumber_WithProperZeroPadding()
+    {
+        // Arrange
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "Jane",
+            LastName = "Smith",
+            Email = "jane.smith@example.com",
+            DepartmentId = "dept-456",
+            Level = 3,
+            Salary = 80000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Mock counter increment to return 42
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(42);
+
+        // Act
+        var result = await _employeeService.CreateAsync(request);
+
+        // Assert
+        var currentYear = DateTime.UtcNow.Year;
+        var expectedEmployeeNumber = $"EMP{currentYear}000042";
+        Assert.Equal(expectedEmployeeNumber, result.EmployeeNumber);
+        Assert.Equal(13, result.EmployeeNumber.Length); // EMP(3) + year(4) + sequential(6) = 13
+    }
+
+    [Fact]
+    public async Task CreateAsync_UsesYearSpecificCounter()
+    {
+        // Arrange
+        var request = new CreateEmployeeRequest
+        {
+            FirstName = "Bob",
+            LastName = "Johnson",
+            Email = "bob.j@example.com",
+            DepartmentId = "dept-789",
+            Level = 7,
+            Salary = 150000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        var currentYear = DateTime.UtcNow.Year;
+        var expectedCounterKey = $"employee-counter:{currentYear}";
+
+        // Mock counter increment
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(expectedCounterKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(123);
+
+        // Act
+        var result = await _employeeService.CreateAsync(request);
+
+        // Assert
+        _mockStateStore.Verify(x => x.IncrementCounterAsync(expectedCounterKey, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.StartsWith($"EMP{currentYear}", result.EmployeeNumber);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SequentialEmployeeNumbers_AreUnique()
+    {
+        // Arrange
+        var request1 = new CreateEmployeeRequest
+        {
+            FirstName = "Alice",
+            LastName = "Anderson",
+            Email = "alice@example.com",
+            DepartmentId = "dept-1",
+            Level = 5,
+            Salary = 100000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        var request2 = new CreateEmployeeRequest
+        {
+            FirstName = "Bob",
+            LastName = "Brown",
+            Email = "bob@example.com",
+            DepartmentId = "dept-2",
+            Level = 5,
+            Salary = 100000.00m,
+            HireDate = DateTime.UtcNow,
+            Status = EmploymentStatus.Pending
+        };
+
+        // Mock counter to increment each time
+        var counter = 0;
+        _mockStateStore.Setup(x => x.IncrementCounterAsync(
+            It.Is<string>(k => k.StartsWith("employee-counter:")),
+            It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => ++counter);
+
+        _mockStateStore.Setup(x => x.GetStateAsync<string>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string?)null);
+
+        // Act
+        var result1 = await _employeeService.CreateAsync(request1);
+        var result2 = await _employeeService.CreateAsync(request2);
+
+        // Assert
+        Assert.NotEqual(result1.EmployeeNumber, result2.EmployeeNumber);
+        Assert.True(int.Parse(result1.EmployeeNumber.Substring(7)) < int.Parse(result2.EmployeeNumber.Substring(7)));
     }
 }

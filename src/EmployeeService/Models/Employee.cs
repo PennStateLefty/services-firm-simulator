@@ -49,8 +49,9 @@ public class Employee
 
 public class CreateEmployeeRequest
 {
-    [Required]
-    public string EmployeeNumber { get; set; } = string.Empty;
+    // EmployeeNumber is now auto-generated and should not be provided in the request
+    // Kept for backward compatibility but not used
+    public string? EmployeeNumber { get; set; }
 
     [Required]
     [StringLength(100)]
