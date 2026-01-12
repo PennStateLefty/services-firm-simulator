@@ -13,6 +13,12 @@ public class Task
     public DateTime? CompletedDate { get; set; }
     public OnboardingTaskStatus Status { get; set; } = OnboardingTaskStatus.NotStarted;
     public int Order { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+
+    public Task()
+    {
+        CreatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
 }
