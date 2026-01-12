@@ -115,6 +115,9 @@ public class EmployeeServiceImpl : IEmployeeService
         };
 
         // Save employee, email index, and compensation history atomically
+        // Note: These are sequential saves, not a true transaction. If any save fails after
+        // a previous one succeeds, it may leave the system in an inconsistent state.
+        // This is consistent with the existing pattern used elsewhere in the codebase.
         await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
         await _stateStore.SaveStateAsync(emailIndexKey, employee.Id, cancellationToken);
         await _stateStore.SaveStateAsync($"{CompensationHistoryPrefix}{compensationHistory.Id}", compensationHistory, cancellationToken);
