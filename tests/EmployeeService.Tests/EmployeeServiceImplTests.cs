@@ -117,9 +117,8 @@ public class EmployeeServiceTests
         Assert.Equal(request.FirstName, result.FirstName);
         Assert.Equal(request.LastName, result.LastName);
         Assert.Equal(request.Email, result.Email);
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("employee:")),
-            It.IsAny<Employee>(),
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -369,14 +368,19 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("employee:") && k.Contains(result.Id)),
-            It.IsAny<Employee>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(capturedOperations);
+        Assert.Contains(capturedOperations, op => op.key.StartsWith("employee:") && op.key.Contains(result.Id));
     }
 
     [Fact]
@@ -406,9 +410,8 @@ public class EmployeeServiceTests
         Assert.Equal(email, exception.Email);
         Assert.Contains(email, exception.Message);
         
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("employee:")),
-            It.IsAny<Employee>(),
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -437,14 +440,19 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
+            It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
+            .Returns(Task.CompletedTask);
+
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            $"email-index:{request.Email.ToLowerInvariant()}",
-            result.Id,
-            It.IsAny<CancellationToken>()), Times.Once);
+        Assert.NotNull(capturedOperations);
+        Assert.Contains(capturedOperations, op => op.key == $"email-index:{request.Email.ToLowerInvariant()}" && op.value.ToString() == result.Id);
     }
 
     [Fact]
@@ -836,23 +844,22 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        CompensationHistory? savedCompensationHistory = null;
-        _mockStateStore.Setup(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("compensation-history:")),
-            It.IsAny<CompensationHistory>(),
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()))
-            .Callback<string, CompensationHistory, CancellationToken>((key, history, ct) => savedCompensationHistory = history)
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
             .Returns(Task.CompletedTask);
 
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("compensation-history:")),
-            It.IsAny<CompensationHistory>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-
+        Assert.NotNull(capturedOperations);
+        var compensationHistoryOp = capturedOperations.FirstOrDefault(op => op.key.StartsWith("compensation-history:"));
+        Assert.NotEqual(default, compensationHistoryOp);
+        
+        var savedCompensationHistory = compensationHistoryOp.value as CompensationHistory;
         Assert.NotNull(savedCompensationHistory);
         Assert.Equal(result.Id, savedCompensationHistory.EmployeeId);
         Assert.Equal(hireDate, savedCompensationHistory.EffectiveDate);
@@ -885,18 +892,22 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        CompensationHistory? capturedHistory = null;
-        _mockStateStore.Setup(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("compensation-history:")),
-            It.IsAny<CompensationHistory>(),
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()))
-            .Callback<string, CompensationHistory, CancellationToken>((key, history, ct) => capturedHistory = history)
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
             .Returns(Task.CompletedTask);
 
         // Act
         var result = await _employeeService.CreateAsync(request);
 
         // Assert
+        Assert.NotNull(capturedOperations);
+        var compensationHistoryOp = capturedOperations.FirstOrDefault(op => op.key.StartsWith("compensation-history:"));
+        Assert.NotEqual(default, compensationHistoryOp);
+        
+        var capturedHistory = compensationHistoryOp.value as CompensationHistory;
         Assert.NotNull(capturedHistory);
         Assert.NotEmpty(capturedHistory.Id);
         Assert.Equal(result.Id, capturedHistory.EmployeeId);
@@ -930,27 +941,25 @@ public class EmployeeServiceTests
             It.IsAny<CancellationToken>()))
             .ReturnsAsync(1);
 
-        string? capturedKey = null;
-        CompensationHistory? capturedHistory = null;
-        _mockStateStore.Setup(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("compensation-history:")),
-            It.IsAny<CompensationHistory>(),
+        IEnumerable<(string key, object value)>? capturedOperations = null;
+        _mockStateStore.Setup(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()))
-            .Callback<string, CompensationHistory, CancellationToken>((key, history, ct) => 
-            {
-                capturedKey = key;
-                capturedHistory = history;
-            })
+            .Callback<IEnumerable<(string key, object value)>, CancellationToken>((ops, ct) => capturedOperations = ops.ToList())
             .Returns(Task.CompletedTask);
 
         // Act
         await _employeeService.CreateAsync(request);
 
         // Assert
-        Assert.NotNull(capturedKey);
+        Assert.NotNull(capturedOperations);
+        var compensationHistoryOp = capturedOperations.FirstOrDefault(op => op.key.StartsWith("compensation-history:"));
+        Assert.NotEqual(default, compensationHistoryOp);
+        
+        var capturedHistory = compensationHistoryOp.value as CompensationHistory;
         Assert.NotNull(capturedHistory);
-        Assert.StartsWith("compensation-history:", capturedKey);
-        Assert.Contains(capturedHistory.Id, capturedKey);
+        Assert.StartsWith("compensation-history:", compensationHistoryOp.key);
+        Assert.Contains(capturedHistory.Id, compensationHistoryOp.key);
     }
 
     [Fact]
@@ -972,9 +981,8 @@ public class EmployeeServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(() => _employeeService.CreateAsync(request));
 
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("compensation-history:")),
-            It.IsAny<CompensationHistory>(),
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -1003,9 +1011,8 @@ public class EmployeeServiceTests
         // Act & Assert
         await Assert.ThrowsAsync<EmailAlreadyExistsException>(() => _employeeService.CreateAsync(request));
 
-        _mockStateStore.Verify(x => x.SaveStateAsync(
-            It.Is<string>(k => k.StartsWith("compensation-history:")),
-            It.IsAny<CompensationHistory>(),
+        _mockStateStore.Verify(x => x.ExecuteStateTransactionAsync(
+            It.IsAny<IEnumerable<(string key, object value)>>(),
             It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -114,13 +114,16 @@ public class EmployeeServiceImpl : IEmployeeService
             CreatedAt = DateTime.UtcNow
         };
 
-        // Save employee, email index, and compensation history atomically
-        // Note: These are sequential saves, not a true transaction. If any save fails after
-        // a previous one succeeds, it may leave the system in an inconsistent state.
-        // This is consistent with the existing pattern used elsewhere in the codebase.
-        await _stateStore.SaveStateAsync($"{EmployeePrefix}{employee.Id}", employee, cancellationToken);
-        await _stateStore.SaveStateAsync(emailIndexKey, employee.Id, cancellationToken);
-        await _stateStore.SaveStateAsync($"{CompensationHistoryPrefix}{compensationHistory.Id}", compensationHistory, cancellationToken);
+        // Save employee, email index, and compensation history atomically using Dapr state transaction
+        // This ensures either all three operations succeed or all fail, maintaining consistency
+        var operations = new List<(string key, object value)>
+        {
+            ($"{EmployeePrefix}{employee.Id}", employee),
+            (emailIndexKey, employee.Id),
+            ($"{CompensationHistoryPrefix}{compensationHistory.Id}", compensationHistory)
+        };
+        
+        await _stateStore.ExecuteStateTransactionAsync(operations, cancellationToken);
         
         _logger.LogInformation("Employee created: {Id} with compensation history: {CompensationHistoryId}", employee.Id, compensationHistory.Id);
         return employee;
