@@ -1,0 +1,6 @@
+@OffboardingService_HostAddress = http://localhost:5082
+
+GET {{OffboardingService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

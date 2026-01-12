@@ -1,0 +1,575 @@
+openapi: 3.0.3
+info:
+  title: Employee Service API
+  description: Manages employee records, directory, and basic employee information for the HR System Simulator
+  version: 1.0.0
+  contact:
+    name: HR System Simulator Team
+
+servers:
+  - url: http://localhost:5001/v1
+    description: Local development
+  - url: https://employee-service.azurecontainerapps.io/v1
+    description: Production
+
+tags:
+  - name: Employees
+    description: Employee CRUD operations
+  - name: Directory
+    description: Employee directory and search
+  - name: Health
+    description: Service health endpoints
+
+paths:
+  /employees:
+    post:
+      tags:
+        - Employees
+      summary: Create a new employee
+      operationId: createEmployee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmployeeRequest'
+      responses:
+        '201':
+          description: Employee created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Employee with this email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Employees
+      summary: List all employees (paginated)
+      operationId: listEmployees
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Onboarding, Active, Inactive]
+          description: Filter by employment status
+        - name: department
+          in: query
+          schema:
+            type: string
+          description: Filter by department name
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeListResponse'
+
+  /employees/{employeeId}:
+    get:
+      tags:
+        - Employees
+      summary: Get employee by ID
+      operationId: getEmployee
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Employee details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Employees
+      summary: Update employee information
+      operationId: updateEmployee
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmployeeRequest'
+      responses:
+        '200':
+          description: Employee updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /employees/search:
+    get:
+      tags:
+        - Directory
+      summary: Search employees by name, email, or employee number
+      operationId: searchEmployees
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query (partial match on name, email, employee number)
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeSummary'
+
+  /employees/{employeeId}/compensation:
+    put:
+      tags:
+        - Employees
+      summary: Update employee compensation
+      operationId: updateCompensation
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCompensationRequest'
+      responses:
+        '200':
+          description: Compensation updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          description: Invalid compensation data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /employees/{employeeId}/compensation/history:
+    get:
+      tags:
+        - Employees
+      summary: Get employee compensation history
+      operationId: getCompensationHistory
+      parameters:
+        - name: employeeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Compensation history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CompensationHistoryEntry'
+        '404':
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    CreateEmployeeRequest:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+        - hireDate
+        - jobTitle
+        - department
+        - salaryType
+        - currentSalary
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+          nullable: true
+        address:
+          $ref: '#/components/schemas/Address'
+        hireDate:
+          type: string
+          format: date
+        jobTitle:
+          type: string
+          minLength: 1
+          maxLength: 200
+        department:
+          type: string
+          minLength: 1
+        managerId:
+          type: string
+          nullable: true
+        employmentType:
+          type: string
+          enum: [FullTime, PartTime, Contract]
+          default: FullTime
+        salaryType:
+          type: string
+          enum: [Annual, Hourly]
+        currentSalary:
+          type: number
+          format: decimal
+          minimum: 0
+        bonusTarget:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+
+    UpdateEmployeeRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phoneNumber:
+          type: string
+          nullable: true
+        address:
+          $ref: '#/components/schemas/Address'
+        jobTitle:
+          type: string
+          minLength: 1
+          maxLength: 200
+        department:
+          type: string
+        managerId:
+          type: string
+          nullable: true
+        employmentType:
+          type: string
+          enum: [FullTime, PartTime, Contract]
+
+    UpdateCompensationRequest:
+      type: object
+      required:
+        - newSalary
+        - effectiveDate
+        - changeType
+        - reason
+      properties:
+        newSalary:
+          type: number
+          format: decimal
+          minimum: 0
+        bonusTarget:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        effectiveDate:
+          type: string
+          format: date
+        changeType:
+          type: string
+          enum: [MeritIncrease, Promotion, MarketAdjustment, Hire, Termination]
+        reason:
+          type: string
+          minLength: 1
+        relatedDocumentId:
+          type: string
+          nullable: true
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: string
+        employeeNumber:
+          type: string
+        personalInfo:
+          type: object
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+            email:
+              type: string
+            phoneNumber:
+              type: string
+              nullable: true
+            address:
+              $ref: '#/components/schemas/Address'
+        employmentInfo:
+          type: object
+          properties:
+            hireDate:
+              type: string
+              format: date
+            jobTitle:
+              type: string
+            department:
+              type: string
+            managerId:
+              type: string
+              nullable: true
+            employmentType:
+              type: string
+              enum: [FullTime, PartTime, Contract]
+            status:
+              type: string
+              enum: [Onboarding, Active, Inactive]
+        compensation:
+          type: object
+          properties:
+            salaryType:
+              type: string
+              enum: [Annual, Hourly]
+            currentSalary:
+              type: number
+              format: decimal
+            currency:
+              type: string
+              default: USD
+            bonusTarget:
+              type: number
+              format: decimal
+              nullable: true
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+
+    EmployeeSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        employeeNumber:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        jobTitle:
+          type: string
+        department:
+          type: string
+        status:
+          type: string
+          enum: [Onboarding, Active, Inactive]
+
+    EmployeeListResponse:
+      type: object
+      properties:
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmployeeSummary'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            totalCount:
+              type: integer
+            totalPages:
+              type: integer
+
+    CompensationHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        employeeId:
+          type: string
+        effectiveDate:
+          type: string
+          format: date
+        changeType:
+          type: string
+          enum: [MeritIncrease, Promotion, MarketAdjustment, Hire, Termination]
+        previousAmount:
+          type: number
+          format: decimal
+          nullable: true
+        newAmount:
+          type: number
+          format: decimal
+        changeAmount:
+          type: number
+          format: decimal
+        changePercentage:
+          type: number
+          format: decimal
+          nullable: true
+        reason:
+          type: string
+        authorizedBy:
+          type: string
+        relatedDocumentId:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zipCode:
+          type: string
+
+    Metadata:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        lastModifiedBy:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [Healthy, Degraded, Unhealthy]
+        checks:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              status:
+                type: string
+              description:
+                type: string

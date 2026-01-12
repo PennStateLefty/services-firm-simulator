@@ -1,0 +1,160 @@
+# .NET / C# / ASP.NET Core
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+*.vspscc
+*.vssscc
+.vs/
+.vscode/settings.json
+*.DotSettings.user
+*.csproj.user
+TestResults/
+[Bb]uild[Ll]og.*
+*.pidb
+*.svclog
+*.scc
+.vs/
+.vscode/launch.json
+.vscode/tasks.json
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Node.js / JavaScript / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+dist/
+dist-ssr/
+*.local
+.vite/
+.cache/
+coverage/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# .NET Aspire
+.aspire/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Dapr
+.dapr/
+
+# Azure
+*.publishsettings
+*.azurePubxml
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+*.coverage
+*.coveragexml
+TestResults/
+coverage/
+lcov.info
+
+# Rider
+.idea/
+*.sln.iml
+
+# JetBrains
+.idea/
+*.iml
+out/
+
+# User-specific files
+*.rsuser
+
+# Mono auto generated files
+mono_crash.*
+
+# Build folders
+build/
+_build/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/packages/build/
+
+# Azure Functions
+local.settings.json
+__blobstorage__/
+__queuestorage__/
+__azurite_db*__.json
+.python_packages/
+
+# OpenAPI / Swagger
+**/swagger.json
+**/swagger.yaml
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
