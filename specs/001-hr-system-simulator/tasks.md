@@ -48,19 +48,19 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T018 Configure Aspire AppHost orchestration in src/AppHost/Program.cs (register Redis, EmployeeService, OnboardingService, PerformanceService, MeritService, OffboardingService all with Dapr sidecars, and frontend)
-- [ ] T019 [P] Implement base Dapr state store wrapper at src/EmployeeService/Infrastructure/DaprStateStore.cs
-- [ ] T018 [P] Setup structured logging with OpenTelemetry in src/EmployeeService/Program.cs
-- [ ] T019 [P] Configure CORS for all services to allow frontend access at localhost:3000 in each service's Program.cs
-- [ ] T020 [P] Add health check endpoints to all services at /health endpoint in each service's Program.cs
-- [ ] T021 Create shared models library at src/Shared/Models/ for common enums (EmploymentStatus, CompetencyType, etc.)
-- [ ] T022 [P] Setup React Router at frontend/src/App.tsx with route structure for all pages
-- [ ] T023 [P] Create base API client wrapper at frontend/src/api/apiClient.ts with error handling and fetch configuration
-- [ ] T024 Create Department entity and API endpoints at src/EmployeeService/Controllers/DepartmentsController.cs (required for all employee operations)
-- [ ] T025 Implement Department state store operations at src/EmployeeService/Services/DepartmentService.cs
-- [ ] T026 Create shared error response models at src/Shared/Models/ErrorResponse.cs
-- [ ] T027 [P] Setup Dapr pub/sub subscription handler infrastructure in all services' Program.cs
-- [ ] T028 Generate TypeScript types from OpenAPI specs at frontend/src/types/employee-api.ts and frontend/src/types/performance-api.ts
+- [X] T018 Configure Aspire AppHost orchestration in src/AppHost/Program.cs (register Redis, EmployeeService, OnboardingService, PerformanceService, MeritService, OffboardingService all with Dapr sidecars, and frontend)
+- [X] T019 [P] Implement base Dapr state store wrapper at src/EmployeeService/Infrastructure/DaprStateStore.cs
+- [X] T018 [P] Setup structured logging with OpenTelemetry in src/EmployeeService/Program.cs
+- [X] T019 [P] Configure CORS for all services to allow frontend access at localhost:3000 in each service's Program.cs
+- [X] T020 [P] Add health check endpoints to all services at /health endpoint in each service's Program.cs
+- [X] T021 Create shared models library at src/Shared/Models/ for common enums (EmploymentStatus, CompetencyType, etc.)
+- [X] T022 [P] Setup React Router at frontend/src/App.tsx with route structure for all pages
+- [X] T023 [P] Create base API client wrapper at frontend/src/api/apiClient.ts with error handling and fetch configuration
+- [X] T024 Create Department entity and API endpoints at src/EmployeeService/Controllers/DepartmentsController.cs (required for all employee operations)
+- [X] T025 Implement Department state store operations at src/EmployeeService/Services/DepartmentService.cs
+- [X] T026 Create shared error response models at src/Shared/Models/ErrorResponse.cs
+- [X] T027 [P] Setup Dapr pub/sub subscription handler infrastructure in all services' Program.cs
+- [X] T028 Generate TypeScript types from OpenAPI specs at frontend/src/types/employee-api.ts and frontend/src/types/performance-api.ts
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
