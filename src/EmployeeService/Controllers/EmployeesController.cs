@@ -229,14 +229,7 @@ public class EmployeesController : ControllerBase
                     Department = departmentName,
                     ManagerId = null, // Not in current Employee model
                     EmploymentType = "FullTime", // Default, not in current Employee model
-                    Status = employee.Status switch
-                    {
-                        EmploymentStatus.Pending => "Onboarding",
-                        EmploymentStatus.Active => "Active",
-                        EmploymentStatus.Terminated => "Inactive",
-                        EmploymentStatus.OnLeave => "Active",
-                        _ => employee.Status.ToString()
-                    }
+                    Status = MapEmploymentStatus(employee.Status)
                 },
                 Compensation = new Compensation
                 {
@@ -261,5 +254,17 @@ public class EmployeesController : ControllerBase
             _logger.LogError(ex, "Error getting employee: {EmployeeId}", employeeId);
             return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext.TraceIdentifier));
         }
+    }
+
+    private static string MapEmploymentStatus(EmploymentStatus status)
+    {
+        return status switch
+        {
+            EmploymentStatus.Pending => "Onboarding",
+            EmploymentStatus.Active => "Active",
+            EmploymentStatus.Terminated => "Inactive",
+            EmploymentStatus.OnLeave => "Active",
+            _ => status.ToString()
+        };
     }
 }
