@@ -68,3 +68,12 @@ public enum OffboardingReason
     EndOfContract,
     Other
 }
+
+public enum CompensationChangeType
+{
+    Hire,
+    Merit,
+    Promotion,
+    Adjustment,
+    Termination
+}
