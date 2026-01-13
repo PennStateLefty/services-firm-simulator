@@ -63,20 +63,14 @@ public class OnboardingServiceImpl : IOnboardingService
             // Update timestamp
             onboardingCase.UpdatedAt = DateTime.UtcNow;
             
-            // If this is a new case, set CreatedAt
-            var existingCase = await _stateStore.GetStateAsync<OnboardingCase>(
-                $"{OnboardingCasePrefix}{onboardingCase.Id}", 
-                cancellationToken);
-            
-            if (existingCase == null)
+            // Set CreatedAt if not already set
+            if (onboardingCase.CreatedAt == default)
             {
                 onboardingCase.CreatedAt = DateTime.UtcNow;
                 _logger.LogInformation("Creating new onboarding case: {Id}", onboardingCase.Id);
             }
             else
             {
-                // Preserve original CreatedAt
-                onboardingCase.CreatedAt = existingCase.CreatedAt;
                 _logger.LogInformation("Updating existing onboarding case: {Id}", onboardingCase.Id);
             }
 

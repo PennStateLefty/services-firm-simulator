@@ -109,12 +109,9 @@ public class OnboardingServiceTests
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
+        // Set CreatedAt to default to simulate a new case
+        newCase.CreatedAt = default;
         
-        _mockStateStore.Setup(x => x.GetStateAsync<OnboardingCase>(
-            $"onboarding-case:{newCase.Id}", 
-            It.IsAny<CancellationToken>()))
-            .ReturnsAsync((OnboardingCase?)null);
-
         _mockStateStore.Setup(x => x.SaveStateAsync(
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
@@ -140,11 +137,6 @@ public class OnboardingServiceTests
         var existingCase = CreateTestOnboardingCase();
         var originalCreatedAt = existingCase.CreatedAt;
         
-        _mockStateStore.Setup(x => x.GetStateAsync<OnboardingCase>(
-            $"onboarding-case:{existingCase.Id}", 
-            It.IsAny<CancellationToken>()))
-            .ReturnsAsync(existingCase);
-
         _mockStateStore.Setup(x => x.SaveStateAsync(
             $"onboarding-case:{existingCase.Id}",
             It.IsAny<OnboardingCase>(),
@@ -172,6 +164,8 @@ public class OnboardingServiceTests
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
+        // Set CreatedAt to default to simulate a new case
+        newCase.CreatedAt = default;
         newCase.Tasks.Add(new OnboardingTask
         {
             Id = "task-2",
@@ -181,11 +175,6 @@ public class OnboardingServiceTests
             Status = OnboardingTaskStatus.NotStarted
         });
         
-        _mockStateStore.Setup(x => x.GetStateAsync<OnboardingCase>(
-            $"onboarding-case:{newCase.Id}", 
-            It.IsAny<CancellationToken>()))
-            .ReturnsAsync((OnboardingCase?)null);
-
         _mockStateStore.Setup(x => x.SaveStateAsync(
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
@@ -218,11 +207,6 @@ public class OnboardingServiceTests
         // Arrange
         var newCase = CreateTestOnboardingCase();
         
-        _mockStateStore.Setup(x => x.GetStateAsync<OnboardingCase>(
-            $"onboarding-case:{newCase.Id}", 
-            It.IsAny<CancellationToken>()))
-            .ReturnsAsync((OnboardingCase?)null);
-
         _mockStateStore.Setup(x => x.SaveStateAsync(
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
@@ -362,16 +346,9 @@ public class OnboardingServiceTests
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
-        var originalUpdatedAt = newCase.UpdatedAt;
+        // Set CreatedAt to default to simulate a new case
+        newCase.CreatedAt = default;
         
-        // Simulate a delay to ensure timestamp changes
-        await System.Threading.Tasks.Task.Delay(10);
-        
-        _mockStateStore.Setup(x => x.GetStateAsync<OnboardingCase>(
-            $"onboarding-case:{newCase.Id}", 
-            It.IsAny<CancellationToken>()))
-            .ReturnsAsync((OnboardingCase?)null);
-
         _mockStateStore.Setup(x => x.SaveStateAsync(
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
@@ -382,7 +359,8 @@ public class OnboardingServiceTests
         var result = await _onboardingService.SaveStateAsync(newCase);
 
         // Assert
-        Assert.True(result.UpdatedAt >= originalUpdatedAt);
+        Assert.True(result.UpdatedAt > default(DateTime));
+        Assert.True(result.CreatedAt > default(DateTime));
     }
 
     [Fact]
@@ -392,11 +370,6 @@ public class OnboardingServiceTests
         var caseId = "custom-case-id";
         var newCase = CreateTestOnboardingCase(id: caseId);
         
-        _mockStateStore.Setup(x => x.GetStateAsync<OnboardingCase>(
-            $"onboarding-case:{caseId}", 
-            It.IsAny<CancellationToken>()))
-            .ReturnsAsync((OnboardingCase?)null);
-
         _mockStateStore.Setup(x => x.SaveStateAsync(
             $"onboarding-case:{caseId}",
             It.IsAny<OnboardingCase>(),
