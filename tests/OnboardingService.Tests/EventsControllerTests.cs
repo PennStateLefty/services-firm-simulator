@@ -13,15 +13,24 @@ namespace OnboardingService.Tests;
 public class EventsControllerTests
 {
     private readonly Mock<IOnboardingService> _mockOnboardingService;
+    private readonly Mock<ITaskTemplateService> _mockTaskTemplateService;
     private readonly Mock<ILogger<EventsController>> _mockLogger;
     private readonly EventsController _controller;
 
     public EventsControllerTests()
     {
         _mockOnboardingService = new Mock<IOnboardingService>();
+        _mockTaskTemplateService = new Mock<ITaskTemplateService>();
         _mockLogger = new Mock<ILogger<EventsController>>();
+        
+        // Setup default behavior for task template service
+        _mockTaskTemplateService
+            .Setup(x => x.GenerateTasksFromTemplates(It.IsAny<DateTime>()))
+            .Returns(new List<OnboardingTask>());
+        
         _controller = new EventsController(
             _mockOnboardingService.Object,
+            _mockTaskTemplateService.Object,
             _mockLogger.Object);
     }
 
@@ -296,7 +305,7 @@ public class EventsControllerTests
     }
 
     [Fact]
-    public async Task HandleEmployeeCreatedAsync_ValidEvent_InitializesEmptyTasksList()
+    public async Task HandleEmployeeCreatedAsync_ValidEvent_InitializesTasksListFromTemplates()
     {
         // Arrange
         var employeeEvent = CreateTestEmployeeCreatedEvent();
@@ -322,7 +331,11 @@ public class EventsControllerTests
         Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(savedCase);
         Assert.NotNull(savedCase.Tasks);
-        Assert.Empty(savedCase.Tasks);
+        
+        // Verify that GenerateTasksFromTemplates was called
+        _mockTaskTemplateService.Verify(
+            x => x.GenerateTasksFromTemplates(It.IsAny<DateTime>()),
+            Times.Once);
     }
 
     [Fact]
@@ -389,5 +402,213 @@ public class EventsControllerTests
         var responseData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
         Assert.NotNull(responseData);
         Assert.True(responseData["processed"].GetBoolean());
+    }
+
+    [Fact]
+    public async Task HandleEmployeeCreatedAsync_ValidEvent_GeneratesTasksUsingTemplateService()
+    {
+        // Arrange
+        var employeeEvent = CreateTestEmployeeCreatedEvent();
+        var startDate = DateTime.UtcNow;
+        
+        var generatedTasks = new List<OnboardingTask>
+        {
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "Setup workstation",
+                TaskType = OnboardingTaskType.Equipment,
+                DueDate = startDate.AddDays(7),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            },
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "HR paperwork",
+                TaskType = OnboardingTaskType.Paperwork,
+                DueDate = startDate.AddDays(14),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            }
+        };
+        
+        _mockTaskTemplateService
+            .Setup(x => x.GenerateTasksFromTemplates(It.IsAny<DateTime>()))
+            .Returns(generatedTasks);
+        
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase>());
+
+        OnboardingCase? savedCase = null;
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(
+                It.IsAny<OnboardingCase>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<OnboardingCase, CancellationToken>((oc, ct) => savedCase = oc)
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.HandleEmployeeCreatedAsync(employeeEvent, CancellationToken.None);
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(savedCase);
+        Assert.NotNull(savedCase.Tasks);
+        Assert.Equal(2, savedCase.Tasks.Count);
+        Assert.Equal("Setup workstation", savedCase.Tasks[0].Description);
+        Assert.Equal("HR paperwork", savedCase.Tasks[1].Description);
+    }
+
+    [Fact]
+    public async Task HandleEmployeeCreatedAsync_ValidEvent_GeneratesTasksWithCorrectDueDates()
+    {
+        // Arrange
+        var employeeEvent = CreateTestEmployeeCreatedEvent();
+        var testStartDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        
+        var generatedTasks = new List<OnboardingTask>
+        {
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "Setup workstation",
+                TaskType = OnboardingTaskType.Equipment,
+                DueDate = testStartDate.AddDays(7),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            },
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "HR paperwork",
+                TaskType = OnboardingTaskType.Paperwork,
+                DueDate = testStartDate.AddDays(14),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            },
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "IT account",
+                TaskType = OnboardingTaskType.Access,
+                DueDate = testStartDate.AddDays(21),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            },
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "Security badge",
+                TaskType = OnboardingTaskType.Access,
+                DueDate = testStartDate.AddDays(28),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            },
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "Benefits enrollment",
+                TaskType = OnboardingTaskType.Paperwork,
+                DueDate = testStartDate.AddDays(30),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            }
+        };
+        
+        _mockTaskTemplateService
+            .Setup(x => x.GenerateTasksFromTemplates(It.IsAny<DateTime>()))
+            .Returns(generatedTasks);
+        
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase>());
+
+        OnboardingCase? savedCase = null;
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(
+                It.IsAny<OnboardingCase>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<OnboardingCase, CancellationToken>((oc, ct) => savedCase = oc)
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.HandleEmployeeCreatedAsync(employeeEvent, CancellationToken.None);
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(savedCase);
+        Assert.NotNull(savedCase.Tasks);
+        Assert.Equal(5, savedCase.Tasks.Count);
+        
+        // Verify due dates match template offsets
+        Assert.Equal(testStartDate.AddDays(7), savedCase.Tasks[0].DueDate);
+        Assert.Equal(testStartDate.AddDays(14), savedCase.Tasks[1].DueDate);
+        Assert.Equal(testStartDate.AddDays(21), savedCase.Tasks[2].DueDate);
+        Assert.Equal(testStartDate.AddDays(28), savedCase.Tasks[3].DueDate);
+        Assert.Equal(testStartDate.AddDays(30), savedCase.Tasks[4].DueDate);
+    }
+
+    [Fact]
+    public async Task HandleEmployeeCreatedAsync_ValidEvent_GeneratesTasksWithNotStartedStatus()
+    {
+        // Arrange
+        var employeeEvent = CreateTestEmployeeCreatedEvent();
+        var startDate = DateTime.UtcNow;
+        
+        var generatedTasks = new List<OnboardingTask>
+        {
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "Setup workstation",
+                TaskType = OnboardingTaskType.Equipment,
+                DueDate = startDate.AddDays(7),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            },
+            new OnboardingTask
+            {
+                Id = Guid.NewGuid().ToString(),
+                Description = "HR paperwork",
+                TaskType = OnboardingTaskType.Paperwork,
+                DueDate = startDate.AddDays(14),
+                Status = OnboardingTaskStatus.NotStarted,
+                AssignedTo = string.Empty
+            }
+        };
+        
+        _mockTaskTemplateService
+            .Setup(x => x.GenerateTasksFromTemplates(It.IsAny<DateTime>()))
+            .Returns(generatedTasks);
+        
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync(
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase>());
+
+        OnboardingCase? savedCase = null;
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(
+                It.IsAny<OnboardingCase>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<OnboardingCase, CancellationToken>((oc, ct) => savedCase = oc)
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.HandleEmployeeCreatedAsync(employeeEvent, CancellationToken.None);
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        Assert.NotNull(savedCase);
+        Assert.NotNull(savedCase.Tasks);
+        Assert.All(savedCase.Tasks, task => 
+            Assert.Equal(OnboardingTaskStatus.NotStarted, task.Status));
     }
 }
