@@ -3,6 +3,7 @@ using EmployeeService.Models;
 using EmployeeService.Exceptions;
 using Shared.Models;
 using System.ComponentModel.DataAnnotations;
+using Dapr.Client;
 
 namespace EmployeeService.Services;
 
@@ -27,19 +28,24 @@ public class EmployeeServiceImpl : IEmployeeService
     private readonly IDaprStateStore _stateStore;
     private readonly IDepartmentService _departmentService;
     private readonly ILogger<EmployeeServiceImpl> _logger;
+    private readonly DaprClient _daprClient;
     private const string EmployeePrefix = "employee:";
     private const string EmailIndexPrefix = "email-index:";
     private const string EmployeeCounterPrefix = "employee-counter:";
     private const string CompensationHistoryPrefix = "compensation-history:";
+    private const string EmployeeEventsTopic = "employee-events";
+    private const string PubSubName = "pubsub";
 
     public EmployeeServiceImpl(
         IDaprStateStore stateStore, 
         IDepartmentService departmentService,
-        ILogger<EmployeeServiceImpl> logger)
+        ILogger<EmployeeServiceImpl> logger,
+        DaprClient daprClient)
     {
         _stateStore = stateStore ?? throw new ArgumentNullException(nameof(stateStore));
         _departmentService = departmentService ?? throw new ArgumentNullException(nameof(departmentService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _daprClient = daprClient ?? throw new ArgumentNullException(nameof(daprClient));
     }
 
     public async Task<Employee?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
@@ -158,6 +164,10 @@ public class EmployeeServiceImpl : IEmployeeService
         await _stateStore.ExecuteStateTransactionAsync(operations, cancellationToken);
         
         _logger.LogInformation("Employee created: {Id} with compensation history: {CompensationHistoryId}", employee.Id, compensationHistory.Id);
+        
+        // Publish EmployeeCreated event
+        await PublishEmployeeCreatedEventAsync(employee, cancellationToken);
+        
         return employee;
     }
 
@@ -381,5 +391,59 @@ public class EmployeeServiceImpl : IEmployeeService
         // Format: EMP{year}{sequential:000000}
         // Example: EMP2026001, EMP2026002, etc.
         return $"EMP{year}{counter:D6}";
+    }
+
+    private async Task PublishEmployeeCreatedEventAsync(Employee employee, CancellationToken cancellationToken)
+    {
+        var employeeCreatedEvent = new EmployeeCreatedEvent
+        {
+            EmployeeId = employee.Id,
+            Email = employee.PersonalInfo.Email,
+            DepartmentId = employee.EmploymentInfo.Department,
+            HireDate = employee.EmploymentInfo.HireDate
+        };
+
+        const int maxRetries = 3;
+        var retryDelay = TimeSpan.FromMilliseconds(100);
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "Publishing EmployeeCreated event for employee {EmployeeId} to topic {Topic} (attempt {Attempt}/{MaxRetries})",
+                    employee.Id, EmployeeEventsTopic, attempt, maxRetries);
+
+                await _daprClient.PublishEventAsync(
+                    PubSubName,
+                    EmployeeEventsTopic,
+                    employeeCreatedEvent,
+                    cancellationToken);
+
+                _logger.LogInformation(
+                    "Successfully published EmployeeCreated event for employee {EmployeeId}",
+                    employee.Id);
+
+                return;
+            }
+            catch (Exception ex) when (attempt < maxRetries)
+            {
+                _logger.LogWarning(ex,
+                    "Failed to publish EmployeeCreated event for employee {EmployeeId} (attempt {Attempt}/{MaxRetries}). Retrying...",
+                    employee.Id, attempt, maxRetries);
+
+                await Task.Delay(retryDelay * attempt, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to publish EmployeeCreated event for employee {EmployeeId} after {MaxRetries} attempts. Event will not be published.",
+                    employee.Id, maxRetries);
+
+                // Don't throw - we don't want to fail employee creation if event publishing fails
+                // The employee has already been created in state store
+                return;
+            }
+        }
     }
 }
