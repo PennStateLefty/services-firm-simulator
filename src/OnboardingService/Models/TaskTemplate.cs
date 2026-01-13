@@ -1,5 +1,3 @@
-using Shared.Models;
-
 namespace OnboardingService.Models;
 
 public class TaskTemplate
