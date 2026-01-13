@@ -9,6 +9,10 @@ using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure onboarding task templates from appsettings.json
+// Templates define the default tasks that are automatically created for each new onboarding case
+// Configuration can be modified in appsettings.json without recompiling
+// Future enhancement: Consider moving to database/state store for runtime editability
 builder.Services.Configure<List<TaskTemplate>>(
     builder.Configuration.GetSection("OnboardingTaskTemplates"));
 

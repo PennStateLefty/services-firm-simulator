@@ -4,11 +4,29 @@ using Shared.Models;
 
 namespace OnboardingService.Services;
 
+/// <summary>
+/// Service for generating onboarding tasks from configurable templates.
+/// </summary>
+/// <remarks>
+/// Current implementation reads templates from appsettings.json via IOptions.
+/// Future enhancements could include:
+/// - Loading templates from a database or state store for runtime editability
+/// - Supporting multiple template sets based on employee type or department
+/// - Allowing custom templates per organization
+/// </remarks>
 public interface ITaskTemplateService
 {
+    /// <summary>
+    /// Generates a list of onboarding tasks based on configured templates.
+    /// </summary>
+    /// <param name="startDate">The start date for the onboarding case, used to calculate due dates</param>
+    /// <returns>A list of OnboardingTask objects generated from templates</returns>
     List<OnboardingTask> GenerateTasksFromTemplates(DateTime startDate);
 }
 
+/// <summary>
+/// Default implementation that reads task templates from configuration.
+/// </summary>
 public class TaskTemplateService : ITaskTemplateService
 {
     private readonly IOptions<List<TaskTemplate>> _taskTemplates;
