@@ -235,9 +235,8 @@ public class OnboardingController : ControllerBase
             {
                 targetTask.CompletedDate = DateTime.UtcNow;
             }
-
-            // Clear completed date if status is changed from Completed
-            if (newStatus != OnboardingTaskStatus.Completed && targetTask.CompletedDate != null)
+            // Clear completed date if status is changed from Completed to something else
+            else if (currentStatus == OnboardingTaskStatus.Completed)
             {
                 targetTask.CompletedDate = null;
             }

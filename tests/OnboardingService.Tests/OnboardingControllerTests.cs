@@ -16,6 +16,7 @@ public class OnboardingControllerTests
     private readonly Mock<IEmployeeValidationService> _mockEmployeeValidationService;
     private readonly Mock<ILogger<OnboardingController>> _mockLogger;
     private readonly OnboardingController _controller;
+    private const string AllCasesQuery = "{}";
 
     public OnboardingControllerTests()
     {
@@ -618,7 +619,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -669,7 +670,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -717,7 +718,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -748,7 +749,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase>());
 
         // Act
@@ -792,7 +793,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         // Act
@@ -837,7 +838,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -885,7 +886,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -930,7 +931,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -974,7 +975,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -1018,7 +1019,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
 
         _mockOnboardingService
@@ -1045,7 +1046,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act
@@ -1091,7 +1092,7 @@ public class OnboardingControllerTests
         };
 
         _mockOnboardingService
-            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .Setup(x => x.QueryStateAsync(AllCasesQuery, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OnboardingCase> { case1, case2 });
 
         _mockOnboardingService
