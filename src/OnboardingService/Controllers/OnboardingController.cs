@@ -14,6 +14,7 @@ public class OnboardingController : ControllerBase
     private readonly ITaskTemplateService _taskTemplateService;
     private readonly IEmployeeValidationService _employeeValidationService;
     private readonly ILogger<OnboardingController> _logger;
+    private const string AllCasesQuery = "{}";
 
     public OnboardingController(
         IOnboardingService onboardingService,
@@ -155,5 +156,135 @@ public class OnboardingController : ControllerBase
             _logger.LogError(ex, "Error getting onboarding case: {OnboardingCaseId}", onboardingCaseId);
             return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext?.TraceIdentifier));
         }
+    }
+
+    /// <summary>
+    /// Updates an onboarding task status
+    /// </summary>
+    [HttpPut("tasks/{taskId}")]
+    public async Task<ActionResult<OnboardingTask>> UpdateTask(
+        string taskId,
+        [FromBody] TaskUpdateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Updating task: {TaskId} to status: {Status}", taskId, request.Status);
+
+            // Validate ModelState
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState
+                    .Where(x => x.Value?.Errors.Count > 0)
+                    .ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value?.Errors.Select(e => e.ErrorMessage).ToArray() ?? Array.Empty<string>()
+                    );
+                return BadRequest(ErrorResponse.ValidationError(errors, HttpContext?.TraceIdentifier));
+            }
+
+            // Find the onboarding case that contains this task
+            // We need to query all cases since we don't have the case ID
+            var allCases = await _onboardingService.QueryStateAsync(AllCasesQuery, cancellationToken);
+            
+            OnboardingCase? targetCase = null;
+            OnboardingTask? targetTask = null;
+
+            foreach (var onboardingCase in allCases)
+            {
+                var task = onboardingCase.Tasks?.FirstOrDefault(t => t.Id == taskId);
+                if (task != null)
+                {
+                    targetCase = onboardingCase;
+                    targetTask = task;
+                    break;
+                }
+            }
+
+            if (targetTask == null || targetCase == null)
+            {
+                _logger.LogWarning("Task not found: {TaskId}", taskId);
+                return NotFound(ErrorResponse.NotFound("Task", HttpContext?.TraceIdentifier));
+            }
+
+            // Validate status transitions
+            var currentStatus = targetTask.Status;
+            var newStatus = request.Status;
+
+            // Status transition validation
+            if (!IsValidStatusTransition(currentStatus, newStatus))
+            {
+                _logger.LogWarning(
+                    "Invalid status transition for task {TaskId}: {CurrentStatus} -> {NewStatus}",
+                    taskId,
+                    currentStatus,
+                    newStatus);
+                return BadRequest(ErrorResponse.ValidationError(
+                    new Dictionary<string, string[]>
+                    {
+                        ["Status"] = new[] { $"Invalid status transition from {currentStatus} to {newStatus}" }
+                    },
+                    HttpContext?.TraceIdentifier
+                ));
+            }
+
+            // Update task status
+            targetTask.Status = newStatus;
+
+            // Set completed date if status is Completed
+            if (newStatus == OnboardingTaskStatus.Completed)
+            {
+                targetTask.CompletedDate = DateTime.UtcNow;
+            }
+            // Clear completed date if status is changed from Completed to something else
+            else if (currentStatus == OnboardingTaskStatus.Completed)
+            {
+                targetTask.CompletedDate = null;
+            }
+
+            // Save the updated onboarding case
+            await _onboardingService.SaveStateAsync(targetCase, cancellationToken);
+
+            _logger.LogInformation(
+                "Successfully updated task {TaskId} to status {Status}",
+                taskId,
+                newStatus);
+
+            return Ok(targetTask);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating task: {TaskId}", taskId);
+            return StatusCode(500, ErrorResponse.InternalServerError(ex.Message, HttpContext?.TraceIdentifier));
+        }
+    }
+
+    private static bool IsValidStatusTransition(OnboardingTaskStatus current, OnboardingTaskStatus next)
+    {
+        // Allow staying in the same status
+        if (current == next)
+        {
+            return true;
+        }
+
+        // Valid transitions:
+        // NotStarted -> InProgress, Completed, Blocked
+        // InProgress -> Completed, Blocked, NotStarted (rollback)
+        // Completed -> InProgress (reopen), Blocked
+        // Blocked -> NotStarted, InProgress
+        return (current, next) switch
+        {
+            (OnboardingTaskStatus.NotStarted, OnboardingTaskStatus.InProgress) => true,
+            (OnboardingTaskStatus.NotStarted, OnboardingTaskStatus.Completed) => true,
+            (OnboardingTaskStatus.NotStarted, OnboardingTaskStatus.Blocked) => true,
+            (OnboardingTaskStatus.InProgress, OnboardingTaskStatus.Completed) => true,
+            (OnboardingTaskStatus.InProgress, OnboardingTaskStatus.Blocked) => true,
+            (OnboardingTaskStatus.InProgress, OnboardingTaskStatus.NotStarted) => true,
+            (OnboardingTaskStatus.Completed, OnboardingTaskStatus.InProgress) => true,
+            (OnboardingTaskStatus.Completed, OnboardingTaskStatus.Blocked) => true,
+            (OnboardingTaskStatus.Blocked, OnboardingTaskStatus.NotStarted) => true,
+            (OnboardingTaskStatus.Blocked, OnboardingTaskStatus.InProgress) => true,
+            _ => false
+        };
     }
 }
