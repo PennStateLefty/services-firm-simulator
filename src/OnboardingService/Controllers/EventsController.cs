@@ -12,15 +12,18 @@ namespace OnboardingService.Controllers;
 public class EventsController : ControllerBase
 {
     private readonly IOnboardingService _onboardingService;
+    private readonly ITaskTemplateService _taskTemplateService;
     private readonly ILogger<EventsController> _logger;
     private const string PubSubName = "pubsub";
     private const string EmployeeEventsTopic = "employee-events";
 
     public EventsController(
         IOnboardingService onboardingService,
+        ITaskTemplateService taskTemplateService,
         ILogger<EventsController> logger)
     {
         _onboardingService = onboardingService ?? throw new ArgumentNullException(nameof(onboardingService));
+        _taskTemplateService = taskTemplateService ?? throw new ArgumentNullException(nameof(taskTemplateService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -60,14 +63,15 @@ public class EventsController : ControllerBase
             }
 
             // Create new onboarding case
+            var startDate = DateTime.UtcNow;
             var onboardingCase = new OnboardingCase
             {
                 Id = Guid.NewGuid().ToString(),
                 EmployeeId = employeeCreatedEvent.EmployeeId,
-                StartDate = DateTime.UtcNow,
-                TargetCompletionDate = DateTime.UtcNow.AddDays(30),
+                StartDate = startDate,
+                TargetCompletionDate = startDate.AddDays(30),
                 Status = OnboardingTaskStatus.NotStarted,
-                Tasks = new List<OnboardingTask>(),
+                Tasks = _taskTemplateService.GenerateTasksFromTemplates(startDate),
                 Notes = $"Automatically created from EmployeeCreated event for {employeeCreatedEvent.Email}",
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
