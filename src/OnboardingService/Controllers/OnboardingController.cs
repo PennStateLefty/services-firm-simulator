@@ -33,7 +33,7 @@ public class OnboardingController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<OnboardingCase>> CreateOnboarding(
         [FromBody] CreateOnboardingRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -69,8 +69,10 @@ public class OnboardingController : ControllerBase
             }
 
             // Check if an onboarding case already exists for this employee
+            // Escape the employee ID to prevent query injection
+            var escapedEmployeeId = System.Text.Json.JsonSerializer.Serialize(request.EmployeeId).Trim('"');
             var existingCases = await _onboardingService.QueryStateAsync(
-                $"{{\"filter\":{{\"EQ\":{{\"employeeId\":\"{request.EmployeeId}\"}}}}}}",
+                $"{{\"filter\":{{\"EQ\":{{\"employeeId\":\"{escapedEmployeeId}\"}}}}}}",
                 cancellationToken);
 
             if (existingCases.Any())
@@ -133,7 +135,7 @@ public class OnboardingController : ControllerBase
     [HttpGet("{onboardingCaseId}")]
     public async Task<ActionResult<OnboardingCase>> GetOnboarding(
         string onboardingCaseId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken = default)
     {
         try
         {

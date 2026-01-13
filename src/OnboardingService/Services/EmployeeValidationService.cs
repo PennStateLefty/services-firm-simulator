@@ -33,10 +33,26 @@ public class EmployeeValidationService : IEmployeeValidationService
 
             return response != null;
         }
-        catch (Dapr.DaprException ex) when (ex.Message.Contains("404") || ex.InnerException?.Message?.Contains("404") == true)
+        catch (Dapr.DaprException ex)
         {
-            _logger.LogWarning("Employee not found: {EmployeeId}", employeeId);
-            return false;
+            // Check if the inner exception is an HttpRequestException with NotFound status
+            if (ex.InnerException is HttpRequestException httpEx && 
+                httpEx.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _logger.LogWarning("Employee not found: {EmployeeId}", employeeId);
+                return false;
+            }
+
+            // Also check message content as fallback for different Dapr versions
+            if (ex.Message.Contains("404") || ex.InnerException?.Message?.Contains("404") == true)
+            {
+                _logger.LogWarning("Employee not found: {EmployeeId}", employeeId);
+                return false;
+            }
+
+            // Other Dapr errors should propagate
+            _logger.LogError(ex, "Error validating employee: {EmployeeId}", employeeId);
+            throw;
         }
         catch (Exception ex)
         {
