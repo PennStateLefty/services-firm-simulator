@@ -1,4 +1,5 @@
 using OnboardingService.Infrastructure;
+using OnboardingService.Services;
 using Dapr.Client;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
@@ -9,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDaprClient();
 builder.Services.AddSingleton<IDaprStateStore, DaprStateStore>();
+builder.Services.AddScoped<IOnboardingService, OnboardingServiceImpl>();
 builder.Services.AddControllers().AddDapr();
 
 builder.Services.AddCors(options =>
