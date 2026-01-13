@@ -497,4 +497,96 @@ public class OnboardingControllerTests
         var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(500, statusCodeResult.StatusCode);
     }
+
+    [Fact]
+    public async Task GetOnboarding_WithTasks_IncludesCompletionPercentage()
+    {
+        // Arrange
+        var caseId = "case-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = caseId,
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask { Id = "1", Status = OnboardingTaskStatus.Completed },
+                new OnboardingTask { Id = "2", Status = OnboardingTaskStatus.Completed },
+                new OnboardingTask { Id = "3", Status = OnboardingTaskStatus.InProgress },
+                new OnboardingTask { Id = "4", Status = OnboardingTaskStatus.NotStarted }
+            }
+        };
+        
+        _mockOnboardingService
+            .Setup(x => x.GetStateAsync(caseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(onboardingCase);
+
+        // Act
+        var result = await _controller.GetOnboarding(caseId, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var returnedCase = Assert.IsType<OnboardingCase>(okResult.Value);
+        Assert.Equal(50.0, returnedCase.CompletionPercentage); // 2 out of 4 tasks completed
+    }
+
+    [Fact]
+    public async Task GetOnboarding_WithNoTasks_ReturnsZeroCompletionPercentage()
+    {
+        // Arrange
+        var caseId = "case-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = caseId,
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.NotStarted,
+            Tasks = new List<OnboardingTask>()
+        };
+        
+        _mockOnboardingService
+            .Setup(x => x.GetStateAsync(caseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(onboardingCase);
+
+        // Act
+        var result = await _controller.GetOnboarding(caseId, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var returnedCase = Assert.IsType<OnboardingCase>(okResult.Value);
+        Assert.Equal(0.0, returnedCase.CompletionPercentage);
+    }
+
+    [Fact]
+    public async Task GetOnboarding_WithAllTasksCompleted_Returns100CompletionPercentage()
+    {
+        // Arrange
+        var caseId = "case-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = caseId,
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.Completed,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask { Id = "1", Status = OnboardingTaskStatus.Completed },
+                new OnboardingTask { Id = "2", Status = OnboardingTaskStatus.Completed },
+                new OnboardingTask { Id = "3", Status = OnboardingTaskStatus.Completed }
+            }
+        };
+        
+        _mockOnboardingService
+            .Setup(x => x.GetStateAsync(caseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(onboardingCase);
+
+        // Act
+        var result = await _controller.GetOnboarding(caseId, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var returnedCase = Assert.IsType<OnboardingCase>(okResult.Value);
+        Assert.Equal(100.0, returnedCase.CompletionPercentage);
+    }
 }
