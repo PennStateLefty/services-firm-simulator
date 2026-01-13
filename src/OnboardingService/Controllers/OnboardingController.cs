@@ -14,6 +14,7 @@ public class OnboardingController : ControllerBase
     private readonly ITaskTemplateService _taskTemplateService;
     private readonly IEmployeeValidationService _employeeValidationService;
     private readonly ILogger<OnboardingController> _logger;
+    private const string AllCasesQuery = "{}";
 
     public OnboardingController(
         IOnboardingService onboardingService,
@@ -184,7 +185,7 @@ public class OnboardingController : ControllerBase
 
             // Find the onboarding case that contains this task
             // We need to query all cases since we don't have the case ID
-            var allCases = await _onboardingService.QueryStateAsync("{}", cancellationToken);
+            var allCases = await _onboardingService.QueryStateAsync(AllCasesQuery, cancellationToken);
             
             OnboardingCase? targetCase = null;
             OnboardingTask? targetTask = null;
@@ -269,7 +270,7 @@ public class OnboardingController : ControllerBase
         // Valid transitions:
         // NotStarted -> InProgress, Completed, Blocked
         // InProgress -> Completed, Blocked, NotStarted (rollback)
-        // Completed -> InProgress (reopen)
+        // Completed -> InProgress (reopen), Blocked
         // Blocked -> NotStarted, InProgress
         return (current, next) switch
         {
