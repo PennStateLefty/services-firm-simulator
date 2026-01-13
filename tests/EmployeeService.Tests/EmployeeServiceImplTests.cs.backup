@@ -176,7 +176,6 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "invalid-email",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual, // Invalid email format
             Department = "dept-123",
             // Level property removed,
@@ -326,7 +325,6 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
@@ -393,7 +391,6 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
@@ -437,8 +434,6 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
-            JobTitle = "Software Engineer",
-            SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -464,7 +459,6 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
@@ -511,8 +505,6 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
-            JobTitle = "Software Engineer",
-            SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -604,7 +596,7 @@ public class EmployeeServiceTests
 
         var updateRequest = new UpdateEmployeeRequest
         {
-            FirstName = "Jane" // Changed from Email since it's not updateable
+            Email = email // Same email
         };
 
         // Act
@@ -659,14 +651,16 @@ public class EmployeeServiceTests
         // Arrange
         var employeeId = "test-id";
         var email = "john.doe@example.com";
-        var existingEmployee = CreateTestEmployee(
-            id: employeeId,
-            employeeNumber: "EMP-1001",
-            firstName: "John",
-            lastName: "Doe",
-            email: email,
-            department: "dept-123"
-        );
+        var existingEmployee = new Employee
+        {
+            Id = employeeId,
+            EmployeeNumber = "EMP-1001",
+            FirstName = "John",
+            LastName = "Doe",
+            Email = email,
+            Department = "dept-123",
+            TerminationDate = null
+        };
         _mockStateStore.Setup(x => x.GetStateAsync<Employee>($"employee:{employeeId}", It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingEmployee);
 
@@ -689,7 +683,6 @@ public class EmployeeServiceTests
             FirstName = "John",
             LastName = "Doe",
             Email = "john.doe@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
@@ -721,7 +714,6 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "jane.smith@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-456",
             // Level property removed,
@@ -755,7 +747,6 @@ public class EmployeeServiceTests
             FirstName = "Bob",
             LastName = "Johnson",
             Email = "bob.j@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-789",
             // Level property removed,
@@ -787,7 +778,6 @@ public class EmployeeServiceTests
             FirstName = "Alice",
             LastName = "Anderson",
             Email = "alice@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-1",
             // Level property removed,
@@ -800,7 +790,6 @@ public class EmployeeServiceTests
             FirstName = "Bob",
             LastName = "Brown",
             Email = "bob@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-2",
             // Level property removed,
@@ -890,7 +879,6 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = "jane.smith@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-456",
             // Level property removed,
@@ -925,7 +913,7 @@ public class EmployeeServiceTests
         Assert.Equal(result.Id, capturedHistory.EmployeeId);
         Assert.Equal(request.HireDate, capturedHistory.EffectiveDate);
         Assert.Null(capturedHistory.PreviousSalary);
-        Assert.Equal(request.CurrentSalary, capturedHistory.NewSalary);
+        Assert.Equal(request.Salary, capturedHistory.NewSalary);
         Assert.Equal(CompensationChangeType.Hire, capturedHistory.ChangeType);
         Assert.Equal("Initial hire", capturedHistory.ChangeReason);
         Assert.Null(capturedHistory.ApprovedBy);
@@ -940,7 +928,6 @@ public class EmployeeServiceTests
             FirstName = "Bob",
             LastName = "Johnson",
             Email = "bob.j@example.com",
-            JobTitle = "Software Engineer",
             SalaryType = SalaryType.Annual,
             Department = "dept-789",
             // Level property removed,
@@ -1014,8 +1001,6 @@ public class EmployeeServiceTests
             FirstName = "Jane",
             LastName = "Smith",
             Email = email,
-            JobTitle = "Software Engineer",
-            SalaryType = SalaryType.Annual,
             Department = "dept-123",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -1036,8 +1021,26 @@ public class EmployeeServiceTests
         // Arrange
         var employees = new List<Employee>
         {
-            CreateTestEmployee(id: "emp-1", employeeNumber: "EMP2026000001", firstName: "Alice", lastName: "Anderson", email: "alice@example.com", department: "dept-1", jobTitle: "Engineer"),
-            CreateTestEmployee(id: "emp-2", employeeNumber: "EMP2026000002", firstName: "Bob", lastName: "Brown", email: "bob@example.com", department: "dept-2", jobTitle: "Designer")
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Alice",
+                LastName = "Anderson",
+                Email = "alice@example.com",
+                Department = "dept-1",
+                JobTitle = "Engineer"
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Bob",
+                LastName = "Brown",
+                Email = "bob@example.com",
+                Department = "dept-2",
+                JobTitle = "Designer"
+            }
         };
 
         var departments = new List<Department>
@@ -1068,15 +1071,16 @@ public class EmployeeServiceTests
     public async Task GetEmployeesAsync_WithPagination_ReturnsCorrectPage()
     {
         // Arrange
-        var employees = Enumerable.Range(1, 25).Select(i => CreateTestEmployee(
-            id: $"emp-{i}",
-            employeeNumber: $"EMP2026{i:D6}",
-            firstName: $"First{i}",
-            lastName: $"Last{i}",
-            email: $"emp{i}@example.com",
-            department: "dept-1",
-            jobTitle: "Employee"
-        )).ToList();
+        var employees = Enumerable.Range(1, 25).Select(i => new Employee
+        {
+            Id = $"emp-{i}",
+            EmployeeNumber = $"EMP2026{i:D6}",
+            FirstName = $"First{i}",
+            LastName = $"Last{i}",
+            Email = $"emp{i}@example.com",
+            Department = "dept-1",
+            JobTitle = "Employee"
+        }).ToList();
 
         var departments = new List<Department>
         {
@@ -1107,9 +1111,36 @@ public class EmployeeServiceTests
         // Arrange
         var employees = new List<Employee>
         {
-            CreateTestEmployee(id: "emp-1", employeeNumber: "EMP2026000001", firstName: "Active", lastName: "User", email: "active@example.com", department: "dept-1", jobTitle: "Engineer", status: EmploymentStatus.Active),
-            CreateTestEmployee(id: "emp-2", employeeNumber: "EMP2026000002", firstName: "Pending", lastName: "User", email: "pending@example.com", department: "dept-1", jobTitle: "Engineer", status: EmploymentStatus.Pending),
-            CreateTestEmployee(id: "emp-3", employeeNumber: "EMP2026000003", firstName: "Terminated", lastName: "User", email: "terminated@example.com", department: "dept-1", jobTitle: "Engineer", status: EmploymentStatus.Terminated)
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Active",
+                LastName = "User",
+                Email = "active@example.com",
+                Department = "dept-1",
+                JobTitle = "Engineer"
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Pending",
+                LastName = "User",
+                Email = "pending@example.com",
+                Department = "dept-1",
+                JobTitle = "Engineer"
+            },
+            new Employee
+            {
+                Id = "emp-3",
+                EmployeeNumber = "EMP2026000003",
+                FirstName = "Terminated",
+                LastName = "User",
+                Email = "terminated@example.com",
+                Department = "dept-1",
+                JobTitle = "Engineer"
+            }
         };
 
         var departments = new List<Department>
@@ -1140,8 +1171,26 @@ public class EmployeeServiceTests
         // Arrange
         var employees = new List<Employee>
         {
-            CreateTestEmployee(id: "emp-1", employeeNumber: "EMP2026000001", firstName: "Alice", lastName: "Anderson", email: "alice@example.com", department: "Engineering", jobTitle: "Engineer"),
-            CreateTestEmployee(id: "emp-2", employeeNumber: "EMP2026000002", firstName: "Bob", lastName: "Brown", email: "bob@example.com", department: "Design", jobTitle: "Designer")
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Alice",
+                LastName = "Anderson",
+                Email = "alice@example.com",
+                Department = "dept-1",
+                JobTitle = "Engineer"
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Bob",
+                LastName = "Brown",
+                Email = "bob@example.com",
+                Department = "dept-2",
+                JobTitle = "Designer"
+            }
         };
 
         var departments = new List<Department>
@@ -1157,7 +1206,7 @@ public class EmployeeServiceTests
             .ReturnsAsync(departments);
 
         // Act
-        var result = await _employeeService.GetEmployeesAsync(1, 50, null, "Engineering");
+        var result = await _employeeService.GetEmployeesAsync(1, 50, null, "dept-1");
 
         // Assert
         Assert.NotNull(result);
@@ -1172,9 +1221,33 @@ public class EmployeeServiceTests
         // Arrange
         var employees = new List<Employee>
         {
-            CreateTestEmployee(id: "emp-1", employeeNumber: "EMP2026000001", firstName: "Charlie", lastName: "Brown", email: "charlie@example.com", department: "dept-1"),
-            CreateTestEmployee(id: "emp-2", employeeNumber: "EMP2026000002", firstName: "Alice", lastName: "Anderson", email: "alice@example.com", department: "dept-1"),
-            CreateTestEmployee(id: "emp-3", employeeNumber: "EMP2026000003", firstName: "Bob", lastName: "Anderson", email: "bob@example.com", department: "dept-1")
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Charlie",
+                LastName = "Brown",
+                Email = "charlie@example.com",
+                Department = "dept-1"
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Alice",
+                LastName = "Anderson",
+                Email = "alice@example.com",
+                Department = "dept-1"
+            },
+            new Employee
+            {
+                Id = "emp-3",
+                EmployeeNumber = "EMP2026000003",
+                FirstName = "Bob",
+                LastName = "Anderson",
+                Email = "bob@example.com",
+                Department = "dept-1"
+            }
         };
 
         var departments = new List<Department>
@@ -1205,10 +1278,42 @@ public class EmployeeServiceTests
         // Arrange
         var employees = new List<Employee>
         {
-            CreateTestEmployee(id: "emp-1", employeeNumber: "EMP2026000001", firstName: "Pending", lastName: "User", email: "pending@example.com", department: "dept-1", status: EmploymentStatus.Pending),
-            CreateTestEmployee(id: "emp-2", employeeNumber: "EMP2026000002", firstName: "Active", lastName: "User", email: "active@example.com", department: "dept-1", status: EmploymentStatus.Active),
-            CreateTestEmployee(id: "emp-3", employeeNumber: "EMP2026000003", firstName: "Terminated", lastName: "User", email: "terminated@example.com", department: "dept-1", status: EmploymentStatus.Terminated),
-            CreateTestEmployee(id: "emp-4", employeeNumber: "EMP2026000004", firstName: "OnLeave", lastName: "User", email: "onleave@example.com", department: "dept-1", status: EmploymentStatus.OnLeave)
+            new Employee
+            {
+                Id = "emp-1",
+                EmployeeNumber = "EMP2026000001",
+                FirstName = "Pending",
+                LastName = "User",
+                Email = "pending@example.com",
+                Department = "dept-1"
+            },
+            new Employee
+            {
+                Id = "emp-2",
+                EmployeeNumber = "EMP2026000002",
+                FirstName = "Active",
+                LastName = "User",
+                Email = "active@example.com",
+                Department = "dept-1"
+            },
+            new Employee
+            {
+                Id = "emp-3",
+                EmployeeNumber = "EMP2026000003",
+                FirstName = "Terminated",
+                LastName = "User",
+                Email = "terminated@example.com",
+                Department = "dept-1"
+            },
+            new Employee
+            {
+                Id = "emp-4",
+                EmployeeNumber = "EMP2026000004",
+                FirstName = "OnLeave",
+                LastName = "User",
+                Email = "onleave@example.com",
+                Department = "dept-1"
+            }
         };
 
         var departments = new List<Department>

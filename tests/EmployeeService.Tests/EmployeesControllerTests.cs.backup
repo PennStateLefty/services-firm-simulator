@@ -91,7 +91,7 @@ public class EmployeesControllerTests
             LastName = "Doe",
             Email = "john.doe@example.com",
             SalaryType = SalaryType.Annual,
-            Department = "Engineering",  // Use department name, not ID
+            Department = departmentId,
             JobTitle = "Software Engineer",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -110,13 +110,13 @@ public class EmployeesControllerTests
             firstName: request.FirstName,
             lastName: request.LastName,
             email: request.Email,
-            department: request.Department,  // This will now be "Engineering"
+            department: request.Department,
             jobTitle: request.JobTitle,
             salary: request.CurrentSalary
         );
 
-        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Department> { department });
+        _mockDepartmentService.Setup(x => x.GetByIdAsync(departmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(department);
 
         _mockEmployeeService.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdEmployee);
@@ -133,7 +133,7 @@ public class EmployeesControllerTests
         
         var returnedEmployee = Assert.IsType<Employee>(createdResult.Value);
         Assert.Equal(createdEmployee.Id, returnedEmployee.Id);
-        Assert.Equal(createdEmployee.PersonalInfo.Email, returnedEmployee.PersonalInfo.Email);
+        Assert.Equal(createdEmployee.Email, returnedEmployee.PersonalInfo.Email);
     }
 
     [Fact]
@@ -180,7 +180,7 @@ public class EmployeesControllerTests
             LastName = "Doe",
             Email = "existing@example.com",
             SalaryType = SalaryType.Annual,
-            Department = "Engineering",
+            Department = departmentId,
             JobTitle = "Software Engineer",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -189,8 +189,8 @@ public class EmployeesControllerTests
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
         
-        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Department> { department });
+        _mockDepartmentService.Setup(x => x.GetByIdAsync(departmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(department);
 
         _mockEmployeeService.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new EmailAlreadyExistsException(request.Email));
@@ -218,7 +218,7 @@ public class EmployeesControllerTests
             LastName = "Doe",
             Email = "invalid-email",
             SalaryType = SalaryType.Annual,
-            Department = "Engineering",
+            Department = departmentId,
             JobTitle = "Software Engineer",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -227,8 +227,8 @@ public class EmployeesControllerTests
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
         
-        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Department> { department });
+        _mockDepartmentService.Setup(x => x.GetByIdAsync(departmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(department);
 
         _mockEmployeeService.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new ValidationException("Invalid email format"));
@@ -255,7 +255,7 @@ public class EmployeesControllerTests
             LastName = "Doe",
             Email = "john.doe@example.com",
             SalaryType = SalaryType.Annual,
-            Department = "Engineering",
+            Department = departmentId,
             JobTitle = "Software Engineer",
             // Level property removed,
             CurrentSalary = 100000.00m,
@@ -264,8 +264,8 @@ public class EmployeesControllerTests
 
         var department = new Department { Id = departmentId, Name = "Engineering" };
         
-        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Department> { department });
+        _mockDepartmentService.Setup(x => x.GetByIdAsync(departmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(department);
 
         _mockEmployeeService.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Database connection failed"));
@@ -287,22 +287,19 @@ public class EmployeesControllerTests
         // Arrange
         var employeeId = "emp-123";
         var departmentId = "dept-123";
-        var createdDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        var employee = CreateTestEmployee(
-            id: employeeId,
-            employeeNumber: "EMP2026000001",
-            firstName: "John",
-            lastName: "Doe",
-            email: "john.doe@example.com",
-            department: "Engineering",
-            jobTitle: "Software Engineer",
-            salary: 100000m
-        );
-        employee.EmploymentInfo.HireDate = createdDate;
-        employee.Metadata = new Metadata
+        var employee = new Employee
         {
-            CreatedAt = createdDate,
-            UpdatedAt = createdDate
+            Id = employeeId,
+            EmployeeNumber = "EMP2026000001",
+            FirstName = "John",
+            LastName = "Doe",
+            Email = "john.doe@example.com",
+            Department = departmentId,
+            JobTitle = "Software Engineer",
+            CurrentSalary = 100000m,
+            HireDate = new DateTime(2026, 1, 1),
+            CreatedAt = new DateTime(2026, 1, 1),
+            UpdatedAt = new DateTime(2026, 1, 1)
         };
 
         var department = new Department
@@ -324,7 +321,7 @@ public class EmployeesControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         Assert.Equal(200, okResult.StatusCode);
         
-        var returnedDto = Assert.IsType<Employee>(okResult.Value);
+        var returnedDto = Assert.IsType<EmployeeDto>(okResult.Value);
         Assert.Equal(employeeId, returnedDto.Id);
         Assert.Equal("EMP2026000001", returnedDto.EmployeeNumber);
         
@@ -338,19 +335,19 @@ public class EmployeesControllerTests
         Assert.NotNull(returnedDto.EmploymentInfo);
         Assert.Equal("Software Engineer", returnedDto.EmploymentInfo.JobTitle);
         Assert.Equal("Engineering", returnedDto.EmploymentInfo.Department);
-        Assert.Equal(EmploymentStatus.Active, returnedDto.EmploymentInfo.Status);
-        Assert.Equal(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), returnedDto.EmploymentInfo.HireDate);
+        Assert.Equal("Active", returnedDto.EmploymentInfo.Status);
+        Assert.Equal(new DateTime(2026, 1, 1), returnedDto.EmploymentInfo.HireDate);
         
         // Verify nested structure - Compensation
         Assert.NotNull(returnedDto.Compensation);
         Assert.Equal(100000m, returnedDto.Compensation.CurrentSalary);
         Assert.Equal("USD", returnedDto.Compensation.Currency);
-        Assert.Equal(SalaryType.Annual, returnedDto.Compensation.SalaryType);
+        Assert.Equal("Annual", returnedDto.Compensation.SalaryType);
         
         // Verify nested structure - Metadata
         Assert.NotNull(returnedDto.Metadata);
-        Assert.Equal(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), returnedDto.Metadata.CreatedAt);
-        Assert.Equal(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), returnedDto.Metadata.UpdatedAt);
+        Assert.Equal(new DateTime(2026, 1, 1), returnedDto.Metadata.CreatedAt);
+        Assert.Equal(new DateTime(2026, 1, 1), returnedDto.Metadata.UpdatedAt);
     }
 
     [Fact]
@@ -405,7 +402,7 @@ public class EmployeesControllerTests
             LastName = "Smith",
             Email = "jane.smith@example.com",
             SalaryType = SalaryType.Annual,
-            Department = "Engineering",
+            Department = departmentId,
             JobTitle = "Senior Engineer",
             // Level property removed,
             CurrentSalary = 120000.00m,
@@ -418,35 +415,15 @@ public class EmployeesControllerTests
         {
             Id = "emp-789",
             EmployeeNumber = "EMP2026000002",
-            PersonalInfo = new PersonalInfo
-            {
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Email = request.Email
-            },
-            EmploymentInfo = new EmploymentInfo
-            {
-                HireDate = DateTime.UtcNow,
-                JobTitle = "Software Engineer",
-                Department = request.Department,
-                EmploymentType = EmploymentType.FullTime,
-                Status = EmploymentStatus.Active
-            },
-            Compensation = new Compensation
-            {
-                SalaryType = SalaryType.Annual,
-                CurrentSalary = 100000m,
-                Currency = "USD"
-            },
-            Metadata = new Metadata
-            {
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            }
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            Department = request.DepartmentId,
+            Status = request.Status
         };
 
-        _mockDepartmentService.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Department> { department });
+        _mockDepartmentService.Setup(x => x.GetByIdAsync(departmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(department);
 
         _mockEmployeeService.Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdEmployee);
