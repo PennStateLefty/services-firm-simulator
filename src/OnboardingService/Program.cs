@@ -20,6 +20,7 @@ builder.Services.AddDaprClient();
 builder.Services.AddSingleton<IDaprStateStore, DaprStateStore>();
 builder.Services.AddScoped<IOnboardingService, OnboardingServiceImpl>();
 builder.Services.AddScoped<ITaskTemplateService, TaskTemplateService>();
+builder.Services.AddScoped<IEmployeeValidationService, EmployeeValidationService>();
 builder.Services.AddControllers().AddDapr();
 
 builder.Services.AddCors(options =>
