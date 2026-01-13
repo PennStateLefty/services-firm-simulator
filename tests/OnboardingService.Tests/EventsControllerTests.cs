@@ -5,6 +5,7 @@ using OnboardingService.Controllers;
 using OnboardingService.Models;
 using OnboardingService.Services;
 using Shared.Models;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace OnboardingService.Tests;
@@ -230,9 +231,11 @@ public class EventsControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
         
-        var value = okResult.Value as dynamic;
-        Assert.NotNull(value);
-        Assert.False((bool)value.GetType().GetProperty("processed")?.GetValue(value)!);
+        // Serialize and deserialize to access anonymous object properties
+        var json = JsonSerializer.Serialize(okResult.Value);
+        var responseData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+        Assert.NotNull(responseData);
+        Assert.False(responseData["processed"].GetBoolean());
     }
 
     [Fact]
@@ -381,8 +384,10 @@ public class EventsControllerTests
         var okResult = Assert.IsType<OkObjectResult>(result);
         Assert.NotNull(okResult.Value);
         
-        var value = okResult.Value as dynamic;
-        Assert.NotNull(value);
-        Assert.True((bool)value.GetType().GetProperty("processed")?.GetValue(value)!);
+        // Serialize and deserialize to access anonymous object properties
+        var json = JsonSerializer.Serialize(okResult.Value);
+        var responseData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+        Assert.NotNull(responseData);
+        Assert.True(responseData["processed"].GetBoolean());
     }
 }
