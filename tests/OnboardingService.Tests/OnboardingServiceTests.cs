@@ -4,6 +4,7 @@ using OnboardingService.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Shared.Models;
+using Task = System.Threading.Tasks.Task;
 
 namespace OnboardingService.Tests;
 
@@ -52,7 +53,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetStateAsync_ExistingCase_ReturnsOnboardingCase()
+    public async Task GetStateAsync_ExistingCase_ReturnsOnboardingCase()
     {
         // Arrange
         var caseId = "test-id";
@@ -73,7 +74,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetStateAsync_NonExistingCase_ReturnsNull()
+    public async Task GetStateAsync_NonExistingCase_ReturnsNull()
     {
         // Arrange
         var caseId = "non-existing-id";
@@ -90,7 +91,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetStateAsync_ExceptionThrown_RethrowsException()
+    public async Task GetStateAsync_ExceptionThrown_RethrowsException()
     {
         // Arrange
         var caseId = "error-id";
@@ -105,7 +106,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_NewCase_CreatesCase()
+    public async Task SaveStateAsync_NewCase_CreatesCase()
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
@@ -116,7 +117,7 @@ public class OnboardingServiceTests
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
             It.IsAny<CancellationToken>()))
-            .Returns(System.Threading.Tasks.Task.CompletedTask);
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _onboardingService.SaveStateAsync(newCase);
@@ -131,7 +132,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_ExistingCase_UpdatesCase()
+    public async Task SaveStateAsync_ExistingCase_UpdatesCase()
     {
         // Arrange
         var existingCase = CreateTestOnboardingCase();
@@ -141,7 +142,7 @@ public class OnboardingServiceTests
             $"onboarding-case:{existingCase.Id}",
             It.IsAny<OnboardingCase>(),
             It.IsAny<CancellationToken>()))
-            .Returns(System.Threading.Tasks.Task.CompletedTask);
+            .Returns(Task.CompletedTask);
 
         // Update the case
         existingCase.Notes = "Updated notes";
@@ -160,7 +161,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_WithTasks_SavesTaskCollection()
+    public async Task SaveStateAsync_WithTasks_SavesTaskCollection()
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
@@ -179,7 +180,7 @@ public class OnboardingServiceTests
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
             It.IsAny<CancellationToken>()))
-            .Returns(System.Threading.Tasks.Task.CompletedTask);
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _onboardingService.SaveStateAsync(newCase);
@@ -194,7 +195,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_NullCase_ThrowsArgumentNullException()
+    public async Task SaveStateAsync_NullCase_ThrowsArgumentNullException()
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => 
@@ -202,7 +203,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_ExceptionThrown_RethrowsException()
+    public async Task SaveStateAsync_ExceptionThrown_RethrowsException()
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
@@ -219,7 +220,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task DeleteStateAsync_ExistingCase_DeletesCase()
+    public async Task DeleteStateAsync_ExistingCase_DeletesCase()
     {
         // Arrange
         var caseId = "test-id";
@@ -233,7 +234,7 @@ public class OnboardingServiceTests
         _mockStateStore.Setup(x => x.DeleteStateAsync(
             $"onboarding-case:{caseId}",
             It.IsAny<CancellationToken>()))
-            .Returns(System.Threading.Tasks.Task.CompletedTask);
+            .Returns(Task.CompletedTask);
 
         // Act
         await _onboardingService.DeleteStateAsync(caseId);
@@ -245,7 +246,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task DeleteStateAsync_NonExistingCase_ThrowsKeyNotFoundException()
+    public async Task DeleteStateAsync_NonExistingCase_ThrowsKeyNotFoundException()
     {
         // Arrange
         var caseId = "non-existing-id";
@@ -261,7 +262,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task DeleteStateAsync_ExceptionThrown_RethrowsException()
+    public async Task DeleteStateAsync_ExceptionThrown_RethrowsException()
     {
         // Arrange
         var caseId = "error-id";
@@ -283,7 +284,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task QueryStateAsync_WithFilter_ReturnsMatchingCases()
+    public async Task QueryStateAsync_WithFilter_ReturnsMatchingCases()
     {
         // Arrange
         var filter = "{\"filter\":{\"EQ\":{\"employeeId\":\"emp-123\"}}}";
@@ -307,7 +308,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task QueryStateAsync_NoMatches_ReturnsEmptyCollection()
+    public async Task QueryStateAsync_NoMatches_ReturnsEmptyCollection()
     {
         // Arrange
         var filter = "{\"filter\":{\"EQ\":{\"employeeId\":\"non-existing\"}}}";
@@ -326,7 +327,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task QueryStateAsync_ExceptionThrown_RethrowsException()
+    public async Task QueryStateAsync_ExceptionThrown_RethrowsException()
     {
         // Arrange
         var filter = "{}";
@@ -342,7 +343,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_UpdatesTimestamp()
+    public async Task SaveStateAsync_UpdatesTimestamp()
     {
         // Arrange
         var newCase = CreateTestOnboardingCase();
@@ -353,7 +354,7 @@ public class OnboardingServiceTests
             $"onboarding-case:{newCase.Id}",
             It.IsAny<OnboardingCase>(),
             It.IsAny<CancellationToken>()))
-            .Returns(System.Threading.Tasks.Task.CompletedTask);
+            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _onboardingService.SaveStateAsync(newCase);
@@ -364,7 +365,7 @@ public class OnboardingServiceTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SaveStateAsync_UsesCorrectKeyPattern()
+    public async Task SaveStateAsync_UsesCorrectKeyPattern()
     {
         // Arrange
         var caseId = "custom-case-id";
@@ -374,7 +375,7 @@ public class OnboardingServiceTests
             $"onboarding-case:{caseId}",
             It.IsAny<OnboardingCase>(),
             It.IsAny<CancellationToken>()))
-            .Returns(System.Threading.Tasks.Task.CompletedTask);
+            .Returns(Task.CompletedTask);
 
         // Act
         await _onboardingService.SaveStateAsync(newCase);

@@ -1,14 +1,15 @@
 using OnboardingService.Infrastructure;
 using OnboardingService.Models;
+using Task = System.Threading.Tasks.Task;
 
 namespace OnboardingService.Services;
 
 public interface IOnboardingService
 {
-    System.Threading.Tasks.Task<OnboardingCase?> GetStateAsync(string id, CancellationToken cancellationToken = default);
-    System.Threading.Tasks.Task<OnboardingCase> SaveStateAsync(OnboardingCase onboardingCase, CancellationToken cancellationToken = default);
-    System.Threading.Tasks.Task DeleteStateAsync(string id, CancellationToken cancellationToken = default);
-    System.Threading.Tasks.Task<IEnumerable<OnboardingCase>> QueryStateAsync(string filter, CancellationToken cancellationToken = default);
+    Task<OnboardingCase?> GetStateAsync(string id, CancellationToken cancellationToken = default);
+    Task<OnboardingCase> SaveStateAsync(OnboardingCase onboardingCase, CancellationToken cancellationToken = default);
+    Task DeleteStateAsync(string id, CancellationToken cancellationToken = default);
+    Task<IEnumerable<OnboardingCase>> QueryStateAsync(string filter, CancellationToken cancellationToken = default);
 }
 
 public class OnboardingServiceImpl : IOnboardingService
@@ -25,7 +26,7 @@ public class OnboardingServiceImpl : IOnboardingService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async System.Threading.Tasks.Task<OnboardingCase?> GetStateAsync(string id, CancellationToken cancellationToken = default)
+    public async Task<OnboardingCase?> GetStateAsync(string id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Getting onboarding case by ID: {Id}", id);
         
@@ -49,7 +50,7 @@ public class OnboardingServiceImpl : IOnboardingService
         }
     }
 
-    public async System.Threading.Tasks.Task<OnboardingCase> SaveStateAsync(OnboardingCase onboardingCase, CancellationToken cancellationToken = default)
+    public async Task<OnboardingCase> SaveStateAsync(OnboardingCase onboardingCase, CancellationToken cancellationToken = default)
     {
         if (onboardingCase == null)
         {
@@ -89,7 +90,7 @@ public class OnboardingServiceImpl : IOnboardingService
         }
     }
 
-    public async System.Threading.Tasks.Task DeleteStateAsync(string id, CancellationToken cancellationToken = default)
+    public async Task DeleteStateAsync(string id, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Deleting onboarding case: {Id}", id);
         
@@ -123,7 +124,7 @@ public class OnboardingServiceImpl : IOnboardingService
         }
     }
 
-    public async System.Threading.Tasks.Task<IEnumerable<OnboardingCase>> QueryStateAsync(string filter, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<OnboardingCase>> QueryStateAsync(string filter, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Querying onboarding cases with filter: {Filter}", filter);
         
