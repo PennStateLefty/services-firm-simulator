@@ -589,4 +589,432 @@ public class OnboardingControllerTests
         var returnedCase = Assert.IsType<OnboardingCase>(okResult.Value);
         Assert.Equal(100.0, returnedCase.CompletionPercentage);
     }
+
+    [Fact]
+    public async Task UpdateTask_ValidRequest_UpdatesTaskStatus()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.NotStarted
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.InProgress
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.InProgress, updatedTask.Status);
+        
+        _mockOnboardingService.Verify(
+            x => x.SaveStateAsync(
+                It.Is<OnboardingCase>(oc => oc.Tasks.First(t => t.Id == taskId).Status == OnboardingTaskStatus.InProgress),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateTask_StatusCompleted_SetsCompletedDate()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.InProgress,
+                    CompletedDate = null
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.Completed
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.Completed, updatedTask.Status);
+        Assert.NotNull(updatedTask.CompletedDate);
+        Assert.True((DateTime.UtcNow - updatedTask.CompletedDate.Value).TotalSeconds < 5);
+    }
+
+    [Fact]
+    public async Task UpdateTask_TaskNotFound_ReturnsNotFound()
+    {
+        // Arrange
+        var taskId = "non-existing-task";
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.InProgress
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase>());
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
+        var errorResponse = Assert.IsType<ErrorResponse>(notFoundResult.Value);
+        Assert.Equal(404, errorResponse.StatusCode);
+        
+        _mockOnboardingService.Verify(
+            x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTask_InvalidStatusTransition_ReturnsBadRequest()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.Completed
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.NotStarted
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+        var errorResponse = Assert.IsType<ErrorResponse>(badRequestResult.Value);
+        Assert.Equal(400, errorResponse.StatusCode);
+        
+        _mockOnboardingService.Verify(
+            x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTask_StatusChangedFromCompleted_ClearsCompletedDate()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var completedDate = DateTime.UtcNow.AddDays(-1);
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.Completed,
+                    CompletedDate = completedDate
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.InProgress
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.InProgress, updatedTask.Status);
+        Assert.Null(updatedTask.CompletedDate);
+    }
+
+    [Fact]
+    public async Task UpdateTask_ValidTransitionNotStartedToCompleted_Succeeds()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.NotStarted
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.Completed
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.Completed, updatedTask.Status);
+    }
+
+    [Fact]
+    public async Task UpdateTask_ValidTransitionToBlocked_Succeeds()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.InProgress
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.Blocked
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.Blocked, updatedTask.Status);
+    }
+
+    [Fact]
+    public async Task UpdateTask_SameStatus_Succeeds()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.InProgress
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.InProgress
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.InProgress, updatedTask.Status);
+    }
+
+    [Fact]
+    public async Task UpdateTask_ServiceThrowsException_Returns500()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.InProgress
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Database error"));
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var statusCodeResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(500, statusCodeResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTask_FindsTaskInMultipleCases()
+    {
+        // Arrange
+        var taskId = "task-456";
+        var case1 = new OnboardingCase
+        {
+            Id = "case-111",
+            EmployeeId = "emp-111",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask { Id = "task-123", Status = OnboardingTaskStatus.InProgress }
+            }
+        };
+
+        var case2 = new OnboardingCase
+        {
+            Id = "case-222",
+            EmployeeId = "emp-222",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask { Id = taskId, Status = OnboardingTaskStatus.NotStarted }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.InProgress
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { case1, case2 });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(taskId, updatedTask.Id);
+        Assert.Equal(OnboardingTaskStatus.InProgress, updatedTask.Status);
+        
+        // Verify that case2 was saved (the one containing the task)
+        _mockOnboardingService.Verify(
+            x => x.SaveStateAsync(
+                It.Is<OnboardingCase>(oc => oc.Id == "case-222"),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
 }
