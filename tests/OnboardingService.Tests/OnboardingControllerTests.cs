@@ -688,6 +688,56 @@ public class OnboardingControllerTests
     }
 
     [Fact]
+    public async Task UpdateTask_Recompletion_UpdatesCompletedDate()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var oldCompletedDate = DateTime.UtcNow.AddDays(-5);
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.InProgress,
+                    CompletedDate = oldCompletedDate // Previously completed, then reopened
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.Completed
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.Completed, updatedTask.Status);
+        Assert.NotNull(updatedTask.CompletedDate);
+        // Verify the CompletedDate was updated to a new timestamp
+        Assert.True((DateTime.UtcNow - updatedTask.CompletedDate.Value).TotalSeconds < 5);
+        Assert.NotEqual(oldCompletedDate, updatedTask.CompletedDate);
+    }
+
+    [Fact]
     public async Task UpdateTask_TaskNotFound_ReturnsNotFound()
     {
         // Arrange
@@ -756,6 +806,53 @@ public class OnboardingControllerTests
         _mockOnboardingService.Verify(
             x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTask_CompletedToBlocked_Succeeds()
+    {
+        // Arrange
+        var taskId = "task-123";
+        var onboardingCase = new OnboardingCase
+        {
+            Id = "case-123",
+            EmployeeId = "emp-123",
+            StartDate = DateTime.UtcNow,
+            Status = OnboardingTaskStatus.InProgress,
+            Tasks = new List<OnboardingTask>
+            {
+                new OnboardingTask
+                {
+                    Id = taskId,
+                    Description = "Complete paperwork",
+                    Status = OnboardingTaskStatus.Completed,
+                    CompletedDate = DateTime.UtcNow.AddDays(-1)
+                }
+            }
+        };
+
+        var request = new TaskUpdateRequest
+        {
+            Status = OnboardingTaskStatus.Blocked
+        };
+
+        _mockOnboardingService
+            .Setup(x => x.QueryStateAsync("{}", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OnboardingCase> { onboardingCase });
+
+        _mockOnboardingService
+            .Setup(x => x.SaveStateAsync(It.IsAny<OnboardingCase>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((OnboardingCase oc, CancellationToken ct) => oc);
+
+        // Act
+        var result = await _controller.UpdateTask(taskId, request, CancellationToken.None);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var updatedTask = Assert.IsType<OnboardingTask>(okResult.Value);
+        Assert.Equal(OnboardingTaskStatus.Blocked, updatedTask.Status);
+        // CompletedDate should be cleared when transitioning away from Completed
+        Assert.Null(updatedTask.CompletedDate);
     }
 
     [Fact]

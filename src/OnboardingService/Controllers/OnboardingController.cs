@@ -231,7 +231,7 @@ public class OnboardingController : ControllerBase
             targetTask.Status = newStatus;
 
             // Set completed date if status is Completed
-            if (newStatus == OnboardingTaskStatus.Completed && targetTask.CompletedDate == null)
+            if (newStatus == OnboardingTaskStatus.Completed)
             {
                 targetTask.CompletedDate = DateTime.UtcNow;
             }
@@ -281,6 +281,7 @@ public class OnboardingController : ControllerBase
             (OnboardingTaskStatus.InProgress, OnboardingTaskStatus.Blocked) => true,
             (OnboardingTaskStatus.InProgress, OnboardingTaskStatus.NotStarted) => true,
             (OnboardingTaskStatus.Completed, OnboardingTaskStatus.InProgress) => true,
+            (OnboardingTaskStatus.Completed, OnboardingTaskStatus.Blocked) => true,
             (OnboardingTaskStatus.Blocked, OnboardingTaskStatus.NotStarted) => true,
             (OnboardingTaskStatus.Blocked, OnboardingTaskStatus.InProgress) => true,
             _ => false
